@@ -17,18 +17,25 @@ export default {
           { type: "docs", release: false },
           { type: "style", release: false },
           { type: "test", release: false },
+          { release: false }
         ],
-        parserOpts: {
-          noteKeywords: ["BREAKING CHANGE", "BREAKING CHANGES"],
-        },
+        parserOpts: { noteKeywords: ["BREAKING CHANGE", "BREAKING CHANGES"] },
       },
     ],
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
+    // ✅ This updates frontend/package.json version field only
+    [
+      "@semantic-release/npm",
+      {
+        npmPublish: false,
+        pkgRoot: ".", // important: run in frontend/
+      },
+    ],
     [
       "@semantic-release/git",
       {
-        assets: ["frontend/package.json", "frontend/CHANGELOG.md"],
+        assets: ["package.json", "CHANGELOG.md"],
         message: "chore(release-frontend): ${nextRelease.version} [skip ci]",
       },
     ],
