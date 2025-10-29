@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import address from "./Address.js";
+import setting from "./Setting.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -11,6 +12,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String },
     avatarUrl: String,
     isGoogleUser: { type: Boolean, default: false },
+    settings: setting.schema,
   },
   { timestamps: true }
 );
