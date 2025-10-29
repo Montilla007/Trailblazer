@@ -6,7 +6,8 @@
   "scripts": {
     "install-all": "npm install --prefix frontend && npm install --prefix backend",
     "build-all": "npm run build --prefix frontend && npm run build --prefix backend",
-    "test-all": "npm test --prefix frontend && npm test --prefix backend"
+    "test-all": "npm test --prefix frontend && npm test --prefix backend",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -19,5 +20,10 @@
   "bugs": {
     "url": "https://github.com/Montilla007/Trailblazer/issues"
   },
-  "homepage": "https://github.com/Montilla007/Trailblazer#readme"
+  "homepage": "https://github.com/Montilla007/Trailblazer#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "husky": "^9.1.7"
+  }
 }
