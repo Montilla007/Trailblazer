@@ -17,7 +17,6 @@ export default {
           { type: "docs", release: false },
           { type: "style", release: false },
           { type: "test", release: false },
-          { release: false }
         ],
         parserOpts: { noteKeywords: ["BREAKING CHANGE", "BREAKING CHANGES"] },
       },
