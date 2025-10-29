@@ -12,6 +12,8 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    permissions:
+      contents: write  # Required for tag/push permissions
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -28,8 +30,8 @@ jobs:
 
       - name: Semantic Release Backend
         env:
-          GH_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
-        run: npx semantic-release 
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}  # <--- use your PAT secret here
+        run: npx semantic-release
 
 #   release-frontend:
 #     name: Release Frontend
