@@ -5,6 +5,8 @@ const connectDB = async () => {
     const uri =
       process.env.NODE_ENV === "production"
         ? process.env.MONGO_URI_PROD
+        : process.env.NODE_ENV === "test"
+        ? process.env.MONGO_URI
         : process.env.MONGO_URI_DEV;
 
     if (!uri) {
