@@ -9,6 +9,7 @@ jobs:
   release-backend:
     name: Release Backend
     runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '(backend)')
     defaults:
       run:
         working-directory: backend
@@ -36,6 +37,7 @@ jobs:
   release-frontend:
     name: Release Frontend
     runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '(frontend)')
     defaults:
       run:
         working-directory: frontend
