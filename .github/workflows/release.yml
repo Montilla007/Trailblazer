@@ -30,30 +30,32 @@ jobs:
 
       - name: Semantic Release Backend
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}  # <--- use your PAT secret here
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} 
         run: npx semantic-release
 
-#   release-frontend:
-#     name: Release Frontend
-#     runs-on: ubuntu-latest
-#     defaults:
-#       run:
-#         working-directory: frontend
-#     steps:
-#       - name: Checkout repo
-#         uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0
+  release-frontend:
+    name: Release Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    permissions:
+      contents: write  # Required for tag/push permissions
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: 24
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
-#       - name: Install dependencies
-#         run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-#       - name: Semantic Release Frontend
-#         env:
-#           GH_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
-#         run: npx semantic-release
+      - name: Semantic Release Frontend
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx semantic-release
