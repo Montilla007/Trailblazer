@@ -1,5 +1,6 @@
 export default {
   branches: ["main"],
+  repositoryUrl: 'https://github.com/Montilla007/Trailblazer.git',
   tagFormat: "backend-v${version}",
   plugins: [
     [
