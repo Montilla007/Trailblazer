@@ -1,6 +1,6 @@
 export default {
   branches: ["main"],
-  repositoryUrl: 'https://github.com/Montilla007/Trailblazer.git',
+  repositoryUrl: "https://github.com/Montilla007/Trailblazer.git",
   tagFormat: "backend-v${version}",
   plugins: [
     [
@@ -23,10 +23,18 @@ export default {
     ],
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
+    // ✅ This updates backend/package.json version field only
+    [
+      "@semantic-release/npm",
+      {
+        npmPublish: false,
+        pkgRoot: ".", // important: run in backend/
+      },
+    ],
     [
       "@semantic-release/git",
       {
-        assets: ["backend/package.json", "backend/CHANGELOG.md"],
+        assets: ["package.json", "CHANGELOG.md"],
         message: "chore(release-backend): ${nextRelease.version} [skip ci]",
       },
     ],
