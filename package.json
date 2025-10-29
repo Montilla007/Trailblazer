@@ -1,9 +1,23 @@
 {
-  "devDependencies": {
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/release-notes-generator": "^14.1.0",
-    "semantic-release": "^25.0.1"
-  }
+  "name": "trailblazer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "npm install --prefix frontend && npm install --prefix backend",
+    "build-all": "npm run build --prefix frontend && npm run build --prefix backend",
+    "test-all": "npm test --prefix frontend && npm test --prefix backend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Montilla007/Trailblazer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Montilla007/Trailblazer/issues"
+  },
+  "homepage": "https://github.com/Montilla007/Trailblazer#readme"
 }
