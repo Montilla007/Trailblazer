@@ -28,7 +28,7 @@ jobs:
 
       - name: Semantic Release Backend
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
         run: npx semantic-release --no-ci
 
   release-frontend:
@@ -53,5 +53,5 @@ jobs:
 
       - name: Semantic Release Frontend
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
         run: npx semantic-release --no-ci
