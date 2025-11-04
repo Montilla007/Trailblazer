@@ -1,14 +1,16 @@
 {
   "name": "frontend",
-  "main": "expo-router/entry",
   "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "reset-project": "node ./scripts/reset-project.js",
+    "release": "semantic-release --config ./release.config.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -38,12 +40,18 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^13.1.1",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "semantic-release": "^25.0.1",
     "@react-native-community/cli": "^20.0.2",
     "@react-native/metro-config": "^0.82.1",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
-  },
-  "private": true
+  }
 }
