@@ -9,7 +9,7 @@
       "name": "Trailblazer — Debug (Real GPS)",
       "type": "dart",
       "request": "launch",
-      "program": "trailblazer/lib/main.dart",
+      "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "debug",
       "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
     },
@@ -17,7 +17,7 @@
       "name": "Trailblazer — Debug (Simulated Movement)",
       "type": "dart",
       "request": "launch",
-      "program": "trailblazer/lib/main.dart",
+      "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "debug",
       "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=true"]
     },
@@ -25,7 +25,7 @@
       "name": "Trailblazer — Profile (Real GPS)",
       "type": "dart",
       "request": "launch",
-      "program": "trailblazer/lib/main.dart",
+      "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "profile",
       "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
     },
@@ -33,7 +33,7 @@
       "name": "Trailblazer — Release (Real GPS)",
       "type": "dart",
       "request": "launch",
-      "program": "trailblazer/lib/main.dart",
+      "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "release",
       "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
     },
@@ -41,7 +41,7 @@
       "name": "Trailblazer — Release (Simulated Movement)",
       "type": "dart",
       "request": "launch",
-      "program": "trailblazer/lib/main.dart",
+      "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "release",
       "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=true"]
     }
