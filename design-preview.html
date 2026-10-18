@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trailblazer design preview</title>
+  <style>
+    /* Change these colors to adjust the look of the preview. */
+    :root {
+      --page: #e9eee8;
+      --phone: #f7f8f4;
+      --surface: #fff;
+      --text: #202b24;
+      --muted: #68746c;
+      --green: #28664a;
+      --green-light: #dfeadf;
+      --orange: #bd7429;
+      --line: #dfe6de;
+      --map-bg: #e3eae1;
+      --map-road: #fafbf7;
+      --map-water: #d9e9e8;
+      --location-ring: #fff;
+      --marker-frame: var(--map-road);
+    }
+    body.dark-mode {
+      --page: #101713;
+      --phone: #17221b;
+      --surface: #202d24;
+      --text: #edf3ee;
+      --muted: #a3b0a6;
+      --green: #88bd98;
+      --green-light: #24382a;
+      --line: #34443a;
+      --map-bg: #22322a;
+      --map-road: #334139;
+      --map-water: #243e3b;
+      --location-ring: #202d24;
+      --marker-frame: #fff;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px 12px;
+      background: var(--page);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .phone {
+      width: min(100%, 380px);
+      overflow: hidden;
+      border-radius: 28px;
+      background: var(--phone);
+      box-shadow: 0 18px 50px #25352a24;
+    }
+    .header {
+      min-height: 64px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand { font-size: 18px; font-weight: 650; }
+    .menu-button { display: grid; place-content: center; gap: 4px; width: 38px; height: 38px; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
+    .menu-button span { display: block; width: 16px; height: 2px; border-radius: 2px; background: var(--text); }
+
+    /* This is a decorative map placeholder. Replace it with your map later. */
+    .map {
+      position: relative;
+      height: 350px;
+      margin: 0 10px;
+      overflow: hidden;
+      border-radius: 22px;
+      background-color: var(--map-bg);
+      background-image:
+        linear-gradient(26deg, transparent 40%, var(--map-road) 40.7%, var(--map-road) 43.1%, transparent 43.8%),
+        linear-gradient(112deg, transparent 24%, var(--map-road) 24.8%, var(--map-road) 27.2%, transparent 28%),
+        linear-gradient(165deg, transparent 62%, var(--map-road) 62.8%, var(--map-road) 65.1%, transparent 65.9%),
+        radial-gradient(ellipse at 82% 17%, var(--map-water) 0 13%, transparent 13.5%),
+        radial-gradient(ellipse at 18% 82%, var(--green-light) 0 18%, transparent 18.5%);
+    }
+    .map::before {
+      content: "";
+      position: absolute;
+      width: 145px;
+      height: 190px;
+      left: 31%;
+      top: 24%;
+      border: 5px solid transparent;
+      border-left-color: var(--green);
+      border-bottom-color: var(--green);
+      border-radius: 54% 0 0 43%;
+      transform: rotate(-17deg);
+    }
+    .map[data-mode="replay"]::before { display: none; }
+    .gps-status {
+      position: absolute;
+      top: 13px;
+      left: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 13px;
+      border: 0;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 72%, transparent);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      backdrop-filter: blur(7px);
+    }
+    .gps-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #24834b; }
+    .gps-status[data-state="weak"] .gps-dot { background: #dda91e; }
+    .gps-status[data-state="disconnected"] .gps-dot { background: #c63d36; }
+    .current-location {
+      position: absolute;
+      top: 50%;
+      left: 57%;
+      width: 20px;
+      height: 20px;
+      border: 4px solid var(--location-ring);
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 2px 10px #0003;
+    }
+    .map[data-mode="replay"] .current-location,
+    .map[data-mode="replay"] .marker-position,
+    .map[data-mode="replay"] .cluster-layer,
+    .map[data-mode="replay"] .map-photo { display: none !important; }
+    .map[data-mode="replay"] .gps-dot { background: var(--orange); }
+    .replay-route { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; }
+    .replay-route[hidden], .replay-controls[hidden] { display: none; }
+    .replay-route .route-base, .replay-route .route-progress { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .replay-route .route-base { stroke: var(--green); stroke-width: 6; opacity: .42; }
+    .replay-route .route-progress { stroke: var(--orange); stroke-width: 7; }
+    .replay-route .route-runner { fill: var(--orange); stroke: #fff; stroke-width: 4; }
+    .replay-controls { position: absolute; right: 10px; bottom: 10px; left: 10px; z-index: 5; padding: 11px 12px 9px; border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--surface) 94%, transparent); color: var(--text); box-shadow: 0 3px 14px #1423192b; backdrop-filter: blur(9px); }
+    .replay-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .replay-kicker { display: block; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+    .replay-date { display: block; margin-top: 2px; font-size: 12px; font-weight: 650; }
+    .replay-close, .replay-play, .replay-speed { border: 0; border-radius: 9px; background: var(--green-light); color: var(--text); font: inherit; cursor: pointer; }
+    .replay-close { width: 30px; height: 30px; font-size: 17px; }
+    .replay-actions { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
+    .replay-play { width: 35px; height: 32px; background: var(--green); color: #fff; font-size: 15px; }
+    .replay-position { flex: 1; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .replay-speed { min-width: 42px; height: 30px; font-size: 10px; font-weight: 650; }
+    .replay-timeline { display: block; width: 100%; height: 18px; margin: 3px 0 0; accent-color: var(--green); cursor: pointer; }
+    .replay-endpoints { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; }
+    .marker-position { position: absolute; width: 48px; height: 57px; z-index: 1; transform: translate(-50%, -100%); }
+    .marker-position[hidden] { display: none; }
+    .map-marker {
+      --marker-size: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: var(--marker-size);
+      position: relative;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .marker-image {
+      width: var(--marker-size);
+      height: var(--marker-size);
+      box-sizing: border-box;
+      padding: 3px;
+      background: var(--marker-frame);
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgb(0 0 0 / 25%);
+      overflow: hidden;
+    }
+    .marker-image img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 7px;
+    }
+    .marker-pointer {
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 9px solid var(--marker-frame);
+    }
+    .map-marker:focus-visible .marker-image, .trail-image:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+    .map-marker[data-selected="true"] .marker-image { outline: 3px solid var(--green); outline-offset: 2px; }
+    .marker-image img.photo-p1 { background: linear-gradient(145deg, #d4e2ce 0 38%, #aebf9e 38% 58%, #708f6c 58% 100%); }
+    .marker-image img.photo-p2 { background: linear-gradient(155deg, #d9e7e9 0 35%, #adc4bd 35% 57%, #647f74 57% 100%); }
+    .marker-image img.photo-p3 { background: linear-gradient(135deg, #e6d7bf 0 34%, #b2a382 34% 58%, #707855 58% 100%); }
+    .marker-image img.photo-p4 { background: linear-gradient(155deg, #d9e7e9 0 35%, #adc4bd 35% 57%, #647f74 57% 100%); }
+    .marker-image img.photo-p5 { background: linear-gradient(145deg, #d4e2ce 0 38%, #aebf9e 38% 58%, #708f6c 58% 100%); }
+    .marker-image img.photo-p6 { background: linear-gradient(130deg, #dfd6bc 0 34%, #a7aa7d 34% 58%, #566d4a 58% 100%); }
+    .cluster-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+    .cluster-layer .map-marker { pointer-events: auto; }
+    .marker-count {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      z-index: 2;
+      min-width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      padding: 0 5px;
+      border: 2px solid var(--surface);
+      border-radius: 999px;
+      background: var(--green);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .zoom-controls {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 2;
+      display: grid;
+      justify-items: center;
+      gap: 5px;
+    }
+    .zoom-controls button {
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 20px;
+      box-shadow: 0 2px 9px #14231930;
+      cursor: pointer;
+    }
+    .zoom-controls button:disabled { opacity: .45; cursor: default; }
+    .zoom-level { color: var(--muted); font-size: 10px; font-weight: 650; }
+    .map-photo {
+      position: absolute;
+      right: 62px;
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 15px;
+      background: var(--surface);
+      box-shadow: 0 3px 14px #1a291e24;
+    }
+    .map-photo[hidden], [hidden] { display: none !important; }
+    .map-thumb {
+      width: 58px;
+      height: 52px;
+      flex: 0 0 auto;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #d4e2ce 0 38%, #aebf9e 38% 58%, #708f6c 58% 100%);
+    }
+    .map-photo-title { font-size: 12px; font-weight: 650; }
+    .map-photo-hint { margin-top: 3px; color: var(--muted); font-size: 11px; }
+
+    .trail { padding: 16px 18px 12px; }
+    .trail-label {
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .trail-title { margin: 0; font-size: 19px; font-weight: 650; }
+    .trail-summary { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .photo-slider { margin: 12px 0 8px; overflow: hidden; border-radius: 16px; }
+    .photo-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    .photo-track::-webkit-scrollbar { display: none; }
+    .trail-image {
+      display: block;
+      flex: 0 0 100%;
+      width: 100%;
+      height: 145px;
+      padding: 0;
+      border: 0;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #d4e2ce 0 38%, #aebf9e 38% 58%, #708f6c 58% 100%);
+      scroll-snap-align: start;
+      cursor: pointer;
+    }
+    .slider-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; }
+    .slider-controls button { min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--green); font: inherit; font-weight: 650; cursor: pointer; }
+    .slider-controls button:disabled { opacity: .45; cursor: default; }
+    .photo-note { margin: 0; font-size: 13px; line-height: 1.45; }
+    .divider { height: 1px; margin: 12px 0; border: 0; background: var(--line); }
+    .photo-meta { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; }
+    .photo-meta span:last-child { text-align: right; }
+    .actions { padding: 0 18px 14px; }
+    .add-photo {
+      width: 100%;
+      min-height: 46px;
+      border: 0;
+      border-radius: 15px;
+      background: var(--green);
+      color: #fff;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .bottom-nav {
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 12px 15px;
+      border-top: 1px solid var(--line);
+    }
+    .nav-item {
+      min-width: 64px;
+      min-height: 42px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .nav-item[aria-current="page"] { color: var(--green); font-weight: 650; }
+    .nav-icon { display: block; margin-bottom: 3px; font-size: 17px; }
+    .album-page { min-height: 510px; padding: 18px; }
+    .album-page[hidden] { display: none; }
+    .album-heading { margin: 0; font-size: 22px; }
+    .album-subtitle { margin: 4px 0 16px; color: var(--muted); font-size: 12px; }
+    .album-filters { display: flex; gap: 7px; margin-bottom: 17px; overflow-x: auto; scrollbar-width: none; }
+    .album-filter { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
+    .album-filter[aria-pressed="true"] { border-color: var(--green); background: var(--green); color: #fff; }
+    .album-date-heading { margin: 0 0 9px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+    .album-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .album-card { min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+    .album-image { display: block; width: 100%; aspect-ratio: 1.12; border-radius: 13px; box-shadow: 0 2px 8px #1423191c; }
+    .album-location { display: block; overflow: hidden; margin-top: 6px; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .album-time { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .album-empty { grid-column: 1 / -1; padding: 28px 10px; color: var(--muted); font-size: 13px; text-align: center; }
+    .history-page { min-height: 510px; padding: 18px; }
+    .history-page[hidden] { display: none; }
+    .history-list { display: grid; gap: 10px; }
+    .outing-card { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 11px; width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+    .outing-route { position: relative; display: grid; place-items: center; min-height: 88px; overflow: hidden; border-radius: 10px; background: var(--map-bg); }
+    .outing-route::before, .outing-route::after { position: absolute; content: ""; background: var(--map-road); border-radius: 99px; transform: rotate(-28deg); }
+    .outing-route::before { width: 140px; height: 10px; }
+    .outing-route::after { width: 90px; height: 7px; transform: rotate(35deg); }
+    .outing-route svg { position: relative; z-index: 1; width: 58px; height: 66px; overflow: visible; }
+    .outing-route path { fill: none; stroke: var(--green); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+    .outing-copy { align-self: center; min-width: 0; }
+    .outing-date { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; }
+    .outing-title { display: block; overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .outing-place { display: block; overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .outing-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; color: var(--text); font-size: 10px; }
+    .outing-stats strong { font-weight: 650; }
+    .history-detail[hidden] { display: none; }
+    .history-back { margin: 0 0 14px; padding: 0; border: 0; background: transparent; color: var(--green); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+    .preview-trail { width: 100%; min-height: 42px; margin: -4px 0 12px; border: 0; border-radius: 12px; background: var(--green); color: #fff; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+    .detail-route { position: relative; display: grid; place-items: center; height: 175px; margin: 14px 0; overflow: hidden; border-radius: 16px; background: var(--map-bg); }
+    .detail-route::before, .detail-route::after { position: absolute; content: ""; width: 150%; height: 18px; background: var(--map-road); border-radius: 99px; transform: rotate(-23deg); }
+    .detail-route::after { width: 115%; height: 12px; transform: rotate(35deg); }
+    .detail-route svg { position: relative; z-index: 1; width: 145px; height: 145px; }
+    .detail-route path { fill: none; stroke: var(--green); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .detail-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 18px; }
+    .detail-stat { padding: 10px 4px; border-radius: 12px; background: var(--surface); text-align: center; }
+    .detail-stat strong { display: block; font-size: 14px; }
+    .detail-stat span { color: var(--muted); font-size: 10px; }
+    .location-list { display: grid; gap: 7px; margin: 0 0 18px; padding: 0; list-style: none; }
+    .location-list li { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 11px; }
+    .location-list li::before { content: ""; width: 7px; height: 7px; flex: 0 0 auto; border: 2px solid var(--green); border-radius: 50%; }
+    .history-photo-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 3px; }
+    .history-photo { flex: 0 0 76px; height: 76px; border-radius: 12px; }
+    .debug-tools { width: min(100%, 380px); margin-top: 12px; }
+    .debug-toggle, .debug-panel button {
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .debug-panel { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <main class="phone">
+    <header class="header">
+      <span class="brand">Trailblazer</span>
+      <button class="menu-button" type="button" aria-label="Open menu"><span></span><span></span><span></span></button>
+    </header>
+
+    <section class="map" aria-label="Trail map">
+      <div class="gps-status" id="gps-status" role="status" data-state="recording" aria-live="polite"><span class="gps-dot" aria-hidden="true"></span><span class="gps-label">Trail Recording</span></div>
+      <span class="current-location" aria-label="Current location"></span>
+      <!-- Add or reposition individual photo markers here. -->
+      <div class="marker-position individual-marker" data-photo="p1"><button class="map-marker" type="button" aria-label="Show Garden path photo"><span class="marker-image"><img class="photo-p1" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt=""></span><span class="marker-pointer"></span></button></div>
+      <div class="marker-position individual-marker" data-photo="p2"><button class="map-marker" type="button" aria-label="Show Riverside stop photo"><span class="marker-image"><img class="photo-p2" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt=""></span><span class="marker-pointer"></span></button></div>
+      <div class="marker-position individual-marker" data-photo="p3"><button class="map-marker" type="button" aria-label="Show Open meadow photo"><span class="marker-image"><img class="photo-p3" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt=""></span><span class="marker-pointer"></span></button></div>
+      <div class="marker-position individual-marker" data-photo="p4"><button class="map-marker" type="button" aria-label="Show Woodland bend photo"><span class="marker-image"><img class="photo-p4" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt=""></span><span class="marker-pointer"></span></button></div>
+      <div class="marker-position individual-marker" data-photo="p5"><button class="map-marker" type="button" aria-label="Show Hill overlook photo"><span class="marker-image"><img class="photo-p5" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt=""></span><span class="marker-pointer"></span></button></div>
+      <div class="marker-position individual-marker" data-photo="p6"><button class="map-marker" type="button" aria-label="Show Pine trail photo"><span class="marker-image"><img class="photo-p6" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt=""></span><span class="marker-pointer"></span></button></div>
+      <!-- The script groups markers that overlap at the current zoom level. -->
+      <div class="cluster-layer" id="cluster-layer"></div>
+      <div class="zoom-controls" aria-label="Map zoom controls">
+        <button type="button" id="zoom-in" aria-label="Zoom in">＋</button>
+        <span class="zoom-level" id="zoom-level">3 / 3</span>
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+      </div>
+      <div class="map-photo" hidden aria-live="polite">
+        <div class="map-thumb" aria-hidden="true"></div>
+        <div><div class="map-photo-title"></div><div class="map-photo-hint"></div></div>
+      </div>
+      <svg class="replay-route" id="replay-route" viewBox="0 0 360 350" preserveAspectRatio="none" aria-hidden="true" hidden>
+        <path class="route-base" id="route-base" d="M36 300 C72 264 88 277 119 237 S175 207 158 174 S113 140 156 119 S213 127 226 91 S277 74 319 45"/>
+        <path class="route-progress" id="route-progress" d="M36 300 C72 264 88 277 119 237 S175 207 158 174 S113 140 156 119 S213 127 226 91 S277 74 319 45"/>
+        <circle class="route-runner" id="route-runner" cx="36" cy="300" r="9"/>
+      </svg>
+      <div class="replay-controls" id="replay-controls" hidden>
+        <div class="replay-heading">
+          <div><span class="replay-kicker">TRAIL REPLAY</span><span class="replay-date" id="replay-date">October 8</span></div>
+          <button class="replay-close" id="replay-close" type="button" aria-label="Return to history">×</button>
+        </div>
+        <div class="replay-actions">
+          <button class="replay-play" id="replay-play" type="button" aria-label="Play trail">▶</button>
+          <span class="replay-position" id="replay-position">0% · Start</span>
+          <button class="replay-speed" id="replay-speed" type="button" aria-label="Change playback speed">1×</button>
+        </div>
+        <input class="replay-timeline" id="replay-timeline" type="range" min="0" max="100" value="0" aria-label="Trail replay position">
+        <div class="replay-endpoints"><span>Start</span><span>End</span></div>
+      </div>
+    </section>
+
+    <section class="trail" aria-live="polite">
+      <p class="trail-label">Your Trail</p>
+      <div class="default-trail">
+        <h1 class="trail-title">A little more of the world, remembered.</h1>
+        <p class="trail-summary">Your route and photo places stay on this phone.</p>
+      </div>
+      <div class="selected-photo" hidden>
+        <h1 class="trail-title photo-note-title"></h1>
+        <div class="photo-slider" aria-label="Photo slider">
+          <div class="photo-track" id="photo-track"></div>
+        </div>
+        <div class="slider-controls" id="slider-controls" hidden>
+          <button type="button" id="slide-newer" aria-label="Show newer photo">← Newer</button>
+          <span id="slide-count" aria-live="polite">1 / 1</span>
+          <button type="button" id="slide-older" aria-label="Show older photo">Older →</button>
+        </div>
+        <hr class="divider">
+        <div class="photo-meta"><span class="photo-location"></span><span class="photo-date"></span></div>
+      </div>
+    </section>
+
+    <div class="actions"><button class="add-photo" type="button">＋ Add a photo</button></div>
+
+    <section class="album-page" id="album-page" aria-label="Photo album" hidden>
+      <h1 class="album-heading">Album</h1>
+      <p class="album-subtitle">Your photos, newest to oldest</p>
+      <div class="album-filters" role="group" aria-label="Filter photos by date">
+        <button class="album-filter" type="button" data-range="today" aria-pressed="true">Today</button>
+        <button class="album-filter" type="button" data-range="week" aria-pressed="false">Week</button>
+        <button class="album-filter" type="button" data-range="month" aria-pressed="false">Month</button>
+        <button class="album-filter" type="button" data-range="year" aria-pressed="false">Year</button>
+      </div>
+      <h2 class="album-date-heading" id="album-date-heading">Today</h2>
+      <div class="album-grid" id="album-grid"></div>
+    </section>
+
+    <section class="history-page" id="history-page" aria-label="Outing history" hidden>
+      <div id="history-list-view">
+        <h1 class="album-heading">History</h1>
+        <p class="album-subtitle">Daily routes and detected movement, newest first</p>
+        <div class="album-filters" role="group" aria-label="Filter daily records by date">
+          <button class="album-filter history-filter" type="button" data-range="today" aria-pressed="true">Today</button>
+          <button class="album-filter history-filter" type="button" data-range="week" aria-pressed="false">Week</button>
+          <button class="album-filter history-filter" type="button" data-range="month" aria-pressed="false">Month</button>
+          <button class="album-filter history-filter" type="button" data-range="year" aria-pressed="false">Year</button>
+        </div>
+        <h2 class="album-date-heading" id="history-date-heading">Today</h2>
+        <div class="history-list" id="history-list"></div>
+      </div>
+      <div class="history-detail" id="history-detail" hidden>
+        <button class="history-back" id="history-back" type="button">← All dates</button>
+        <p class="trail-label" id="history-detail-date" hidden></p>
+        <h1 class="album-heading" id="history-detail-title"></h1>
+        <p class="album-subtitle" id="history-detail-place"></p>
+        <div class="detail-route" aria-label="Route preview"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M22 102 C34 85 56 88 51 68 S27 48 44 37 S73 34 69 19 S86 13 101 18"/></svg></div>
+        <button class="preview-trail" id="preview-trail" type="button">▶ Preview trail</button>
+        <div class="detail-stats" id="history-detail-stats"></div>
+        <h2 class="album-date-heading">Places along this route</h2>
+        <ul class="location-list" id="history-location-list"></ul>
+        <h2 class="album-date-heading">Photos from this day</h2>
+        <div class="history-photo-row" id="history-photos"></div>
+      </div>
+    </section>
+
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button class="nav-item" id="map-tab" type="button" aria-current="page"><span class="nav-icon" aria-hidden="true">⌖</span>Map</button>
+      <button class="nav-item" id="album-tab" type="button"><span class="nav-icon" aria-hidden="true">▧</span>Album</button>
+      <button class="nav-item" id="history-tab" type="button"><span class="nav-icon" aria-hidden="true">◷</span>History</button>
+    </nav>
+  </main>
+
+  <aside class="debug-tools" aria-label="Preview debug controls">
+    <button class="debug-toggle" id="debug-toggle" type="button" aria-expanded="false" aria-controls="debug-panel">Debug controls</button>
+    <div class="debug-panel" id="debug-panel" hidden>
+      <button type="button" id="dark-mode-toggle">Turn on dark mode</button>
+      <button type="button" id="gps-cycle">Cycle GPS connection</button>
+    </div>
+  </aside>
+
+  <script>
+    // Add photos here. x and y set the photo's position on the map.
+    const photos = {
+      p1: { location: "Garden path", date: "May 12 · 9:18 AM", daysAgo: 153, note: "Morning light on the trail.", order: 1, x: 20, y: 37, background: "linear-gradient(145deg, #d4e2ce 0 38%, #aebf9e 38% 58%, #708f6c 58% 100%)" },
+      p2: { location: "Riverside stop", date: "Sep 25 · 10:42 AM", daysAgo: 17, note: "A quiet spot by the water. Took a moment to enjoy the view.", order: 2, x: 38, y: 52, background: "linear-gradient(155deg, #d9e7e9 0 35%, #adc4bd 35% 57%, #647f74 57% 100%)" },
+      p3: { location: "Open meadow", date: "Oct 8 · 10:56 AM", daysAgo: 4, note: "", order: 3, x: 66, y: 34, background: "linear-gradient(135deg, #e6d7bf 0 34%, #b2a382 34% 58%, #707855 58% 100%)" },
+      p4: { location: "Woodland bend", date: "Oct 11 · 11:08 AM", daysAgo: 1, note: "Shady trail and a lovely patch of morning light.", order: 4, x: 82, y: 51, background: "linear-gradient(155deg, #d9e7e9 0 35%, #adc4bd 35% 57%, #647f74 57% 100%)" },
+      p5: { location: "Hill overlook", date: "Today · 11:24 AM", daysAgo: 0, note: "A wide view across the hills.", order: 5, x: 60, y: 82, background: "linear-gradient(145deg, #d4e2ce 0 38%, #aebf9e 38% 58%, #708f6c 58% 100%)" },
+      p6: { location: "Pine trail", date: "Today · 11:41 AM", daysAgo: 0, note: "", order: 6, x: 46, y: 67, background: "linear-gradient(130deg, #dfd6bc 0 34%, #a7aa7d 34% 58%, #566d4a 58% 100%)" }
+    };
+    const dailyRecords = [
+      { dayLabel: "Today", date: "October 12, 2026", locations: ["Lingayen, Pangasinan"], daysAgo: 0, distance: "3.2 km", movingTime: "58 min", count: 2, photoIds: ["p6", "p5"] },
+      { dayLabel: "October 11", date: "October 11, 2026", locations: ["Dagupan City, Pangasinan"], daysAgo: 1, distance: "4.8 km", movingTime: "1 hr 22 min", count: 1, photoIds: ["p4"] },
+      { dayLabel: "October 8", date: "October 8, 2026", locations: ["Lingayen, Pangasinan", "Dagupan City, Pangasinan", "Urdaneta City, Pangasinan", "Tarlac City, Tarlac"], daysAgo: 4, distance: "135 km", movingTime: "3 hr 12 min", count: 1, photoIds: ["p3"] },
+      { dayLabel: "September 25", date: "September 25, 2026", locations: ["Alaminos City, Pangasinan"], daysAgo: 17, distance: "5.1 km", movingTime: "1 hr 35 min", count: 1, photoIds: ["p2"] },
+      { dayLabel: "May 12", date: "May 12, 2026", locations: ["Bolinao, Pangasinan"], daysAgo: 153, distance: "1.9 km", movingTime: "34 min", count: 1, photoIds: ["p1"] }
+    ];
+
+    const individualMarkers = document.querySelectorAll(".individual-marker");
+    const map = document.querySelector(".map");
+    const trail = document.querySelector(".trail");
+    const albumPage = document.querySelector("#album-page");
+    const historyPage = document.querySelector("#history-page");
+    const historyList = document.querySelector("#history-list");
+    const historyDateHeading = document.querySelector("#history-date-heading");
+    const historyFilters = document.querySelectorAll(".history-filter");
+    const historyListView = document.querySelector("#history-list-view");
+    const historyDetail = document.querySelector("#history-detail");
+    const historyTab = document.querySelector("#history-tab");
+    const replayRoute = document.querySelector("#replay-route");
+    const routeBase = document.querySelector("#route-base");
+    const routeProgress = document.querySelector("#route-progress");
+    const routeRunner = document.querySelector("#route-runner");
+    const replayControls = document.querySelector("#replay-controls");
+    const replayPlay = document.querySelector("#replay-play");
+    const replaySpeed = document.querySelector("#replay-speed");
+    const replayTimeline = document.querySelector("#replay-timeline");
+    const replayPosition = document.querySelector("#replay-position");
+    let activeHistoryRecord = null;
+    let replayProgressValue = 0;
+    let replaySpeedIndex = 0;
+    let replayTimer = null;
+    const replaySpeeds = [1, 2, 4];
+    const albumGrid = document.querySelector("#album-grid");
+    const albumDateHeading = document.querySelector("#album-date-heading");
+    const albumFilters = document.querySelectorAll(".album-filter");
+    const mapTab = document.querySelector("#map-tab");
+    const albumTab = document.querySelector("#album-tab");
+    const clusterLayer = document.querySelector("#cluster-layer");
+    const mapPhoto = document.querySelector(".map-photo");
+    const mapPhotoThumb = document.querySelector(".map-thumb");
+    const defaultTrail = document.querySelector(".default-trail");
+    const selectedPhoto = document.querySelector(".selected-photo");
+    const actions = document.querySelector(".actions");
+    const photoTrack = document.querySelector("#photo-track");
+    const sliderControls = document.querySelector("#slider-controls");
+    const slideNewer = document.querySelector("#slide-newer");
+    const slideOlder = document.querySelector("#slide-older");
+    const slideCount = document.querySelector("#slide-count");
+    const gpsStatus = document.querySelector("#gps-status");
+    const gpsStates = [
+      { state: "recording", label: "Trail Recording" },
+      { state: "weak", label: "Weak GPS Signal" },
+      { state: "disconnected", label: "GPS Disconnected" }
+    ];
+    let gpsStateIndex = 0;
+    let zoomLevel = 3;
+    let activePhotoIds = [];
+    let activePhotoIndex = 0;
+    const zoomLevelLabel = document.querySelector("#zoom-level");
+    const zoomIn = document.querySelector("#zoom-in");
+    const zoomOut = document.querySelector("#zoom-out");
+    const debugToggle = document.querySelector("#debug-toggle");
+    const debugPanel = document.querySelector("#debug-panel");
+    const darkModeToggle = document.querySelector("#dark-mode-toggle");
+
+    function activatePage(page) {
+      if (page !== "map" && map.dataset.mode === "replay") {
+        pauseReplay();
+        replayRoute.hidden = true;
+        replayControls.hidden = true;
+        map.removeAttribute("data-mode");
+        gpsStatus.querySelector(".gps-label").textContent = gpsStates[gpsStateIndex].label;
+      }
+      const showingAlbum = page === "album";
+      const showingHistory = page === "history";
+      map.hidden = showingAlbum || showingHistory;
+      trail.hidden = showingAlbum || showingHistory;
+      actions.hidden = showingAlbum || showingHistory || !selectedPhoto.hidden;
+      albumPage.hidden = !showingAlbum;
+      historyPage.hidden = !showingHistory;
+      [mapTab, albumTab, historyTab].forEach(tab => tab.removeAttribute("aria-current"));
+      (showingAlbum ? albumTab : showingHistory ? historyTab : mapTab).setAttribute("aria-current", "page");
+    }
+
+    function renderAlbum(range = "today") {
+      const limits = { today: 0, week: 6, month: 30, year: 365 };
+      const labels = { today: "Today", week: "This week", month: "This month", year: "This year" };
+      albumDateHeading.textContent = labels[range];
+      albumFilters.forEach(filter => filter.setAttribute("aria-pressed", String(filter.dataset.range === range)));
+      const matchingPhotos = Object.entries(photos)
+        .filter(([, photo]) => photo.daysAgo <= limits[range])
+        .sort((left, right) => right[1].order - left[1].order);
+      albumGrid.replaceChildren();
+      if (!matchingPhotos.length) {
+        albumGrid.innerHTML = '<p class="album-empty">No photos in this time range yet.</p>';
+        return;
+      }
+      matchingPhotos.forEach(([id, photo]) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "album-card";
+        card.setAttribute("aria-label", `Open ${photo.location}, ${photo.date}`);
+        card.innerHTML = `<span class="album-image" style="background:${photo.background}"></span><span class="album-location"></span><span class="album-time"></span>`;
+        card.querySelector(".album-location").textContent = photo.location;
+        card.querySelector(".album-time").textContent = photo.date;
+        card.addEventListener("click", () => {
+          activatePage("map");
+          const marker = document.querySelector(`.individual-marker[data-photo="${id}"] .map-marker`);
+          showPhotos([id], marker);
+        });
+        albumGrid.append(card);
+      });
+    }
+
+    function renderHistory(range = "today") {
+      const limits = { today: 0, week: 6, month: 30, year: 365 };
+      const labels = { today: "Today", week: "This week", month: "This month", year: "This year" };
+      historyDateHeading.textContent = labels[range];
+      historyFilters.forEach(filter => filter.setAttribute("aria-pressed", String(filter.dataset.range === range)));
+      const matchingDays = dailyRecords.filter(record => record.daysAgo <= limits[range]).sort((a, b) => a.daysAgo - b.daysAgo);
+      historyList.replaceChildren();
+      if (!matchingDays.length) {
+        historyList.innerHTML = '<p class="album-empty">No daily records in this time range yet.</p>';
+        return;
+      }
+      matchingDays.forEach(record => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "outing-card";
+        card.innerHTML = `<span class="outing-route" aria-hidden="true"><svg viewBox="0 0 60 70"><path d="M8 62 C17 53 12 42 25 38 S42 33 34 23 S42 13 53 8"/></svg></span><span class="outing-copy"><span class="outing-date"></span><span class="outing-title"></span><span class="outing-place"></span><span class="outing-stats"><span><strong></strong></span><span><strong></strong></span><span><strong></strong></span></span></span>`;
+        card.querySelector(".outing-date").textContent = "DAILY ROUTE";
+        card.querySelector(".outing-title").textContent = record.dayLabel;
+        const provinces = [...new Set(record.locations.map(location => location.split(",").at(-1).trim()))];
+        const routeSummary = provinces.length > 1
+          ? provinces.join(" → ")
+          : record.locations.length > 1
+            ? `${record.locations[0].split(",")[0]} → ${record.locations[record.locations.length - 1].split(",")[0]}`
+            : record.locations[0];
+        card.querySelector(".outing-place").textContent = routeSummary;
+        const stats = card.querySelectorAll(".outing-stats strong");
+        stats[0].textContent = record.distance;
+        stats[1].textContent = record.movingTime;
+        stats[2].textContent = `${record.count} photos`;
+        card.setAttribute("aria-label", `${record.dayLabel}, ${record.distance}, ${record.movingTime} moving time, ${record.count} photos`);
+        card.addEventListener("click", () => openDay(record));
+        historyList.append(card);
+      });
+    }
+
+    function openDay(record) {
+      activeHistoryRecord = record;
+      historyListView.hidden = true;
+      historyDetail.hidden = false;
+      document.querySelector("#history-detail-date").textContent = record.date;
+      document.querySelector("#history-detail-title").textContent = record.dayLabel;
+      const routeProvinces = [...new Set(record.locations.map(location => location.split(",").at(-1).trim()))];
+      document.querySelector("#history-detail-place").textContent = routeProvinces.length > 1
+        ? routeProvinces.join(" → ")
+        : record.locations.length > 1
+          ? `${record.locations[0].split(",")[0]} → ${record.locations[record.locations.length - 1].split(",")[0]}`
+          : record.locations[0];
+      document.querySelector("#history-detail-stats").innerHTML = `<div class="detail-stat"><strong>${record.distance}</strong><span>Distance</span></div><div class="detail-stat"><strong>${record.movingTime}</strong><span>Moving time</span></div><div class="detail-stat"><strong>${record.count}</strong><span>Photos</span></div>`;
+      const locationList = document.querySelector("#history-location-list");
+      locationList.replaceChildren();
+      record.locations.forEach(location => {
+        const item = document.createElement("li");
+        item.textContent = location;
+        locationList.append(item);
+      });
+      const photoRow = document.querySelector("#history-photos");
+      photoRow.replaceChildren();
+      record.photoIds.forEach(id => {
+        const photo = photos[id];
+        const thumb = document.createElement("span");
+        thumb.className = "history-photo";
+        thumb.style.background = photo.background;
+        thumb.setAttribute("aria-label", photo.location);
+        thumb.title = photo.location;
+        photoRow.append(thumb);
+      });
+    }
+
+    function updateReplayProgress(value) {
+      replayProgressValue = Math.max(0, Math.min(100, Number(value)));
+      replayTimeline.value = String(replayProgressValue);
+      const totalLength = routeBase.getTotalLength();
+      routeProgress.style.strokeDasharray = String(totalLength);
+      routeProgress.style.strokeDashoffset = String(totalLength * (1 - replayProgressValue / 100));
+      const point = routeBase.getPointAtLength(totalLength * replayProgressValue / 100);
+      routeRunner.setAttribute("cx", String(point.x));
+      routeRunner.setAttribute("cy", String(point.y));
+      replayPosition.textContent = `${Math.round(replayProgressValue)}% · ${replayProgressValue >= 100 ? "End" : replayProgressValue === 0 ? "Start" : "Replaying"}`;
+    }
+
+    function pauseReplay() {
+      if (replayTimer !== null) window.clearInterval(replayTimer);
+      replayTimer = null;
+      replayPlay.textContent = "▶";
+      replayPlay.setAttribute("aria-label", "Play trail");
+    }
+
+    function toggleReplay() {
+      if (replayTimer !== null) {
+        pauseReplay();
+        return;
+      }
+      if (replayProgressValue >= 100) updateReplayProgress(0);
+      replayPlay.textContent = "Ⅱ";
+      replayPlay.setAttribute("aria-label", "Pause trail");
+      replayTimer = window.setInterval(() => {
+        const next = replayProgressValue + 0.45 * replaySpeeds[replaySpeedIndex];
+        updateReplayProgress(next);
+        if (next >= 100) pauseReplay();
+      }, 100);
+    }
+
+    function startReplay() {
+      if (!activeHistoryRecord) return;
+      activatePage("map");
+      map.dataset.mode = "replay";
+      replayRoute.hidden = false;
+      replayControls.hidden = false;
+      gpsStatus.querySelector(".gps-label").textContent = "Trail Replay";
+      const provinces = [...new Set(activeHistoryRecord.locations.map(location => location.split(",").at(-1).trim()))];
+      const summary = provinces.length > 1 ? provinces.join(" → ") : provinces[0];
+      document.querySelector("#replay-date").textContent = `${activeHistoryRecord.dayLabel} · ${summary}`;
+      pauseReplay();
+      updateReplayProgress(0);
+    }
+
+    function stopReplay() {
+      pauseReplay();
+      replayRoute.hidden = true;
+      replayControls.hidden = true;
+      map.removeAttribute("data-mode");
+      gpsStatus.querySelector(".gps-label").textContent = gpsStates[gpsStateIndex].label;
+      activatePage("history");
+    }
+
+    function closeOuting() {
+      historyDetail.hidden = true;
+      historyListView.hidden = false;
+    }
+
+    mapTab.addEventListener("click", () => activatePage("map"));
+    albumTab.addEventListener("click", () => activatePage("album"));
+    historyTab.addEventListener("click", () => { closeOuting(); activatePage("history"); });
+    document.querySelector("#history-back").addEventListener("click", closeOuting);
+    document.querySelector("#preview-trail").addEventListener("click", startReplay);
+    document.querySelector("#replay-close").addEventListener("click", stopReplay);
+    replayPlay.addEventListener("click", toggleReplay);
+    replayTimeline.addEventListener("input", () => {
+      pauseReplay();
+      updateReplayProgress(replayTimeline.value);
+    });
+    replaySpeed.addEventListener("click", () => {
+      replaySpeedIndex = (replaySpeedIndex + 1) % replaySpeeds.length;
+      replaySpeed.textContent = `${replaySpeeds[replaySpeedIndex]}×`;
+    });
+    albumFilters.forEach(filter => filter.addEventListener("click", () => renderAlbum(filter.dataset.range)));
+    historyFilters.forEach(filter => filter.addEventListener("click", () => renderHistory(filter.dataset.range)));
+    renderAlbum();
+    renderHistory();
+
+    debugToggle.addEventListener("click", () => {
+      debugPanel.hidden = !debugPanel.hidden;
+      debugToggle.setAttribute("aria-expanded", String(!debugPanel.hidden));
+    });
+
+    darkModeToggle.addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+      darkModeToggle.textContent = document.body.classList.contains("dark-mode") ? "Turn off dark mode" : "Turn on dark mode";
+    });
+
+    document.querySelector("#gps-cycle").addEventListener("click", () => {
+      gpsStateIndex = (gpsStateIndex + 1) % gpsStates.length;
+      const nextState = gpsStates[gpsStateIndex];
+      gpsStatus.dataset.state = nextState.state;
+      gpsStatus.querySelector(".gps-label").textContent = nextState.label;
+    });
+
+    function renderZoom() {
+      map.dataset.zoom = String(zoomLevel);
+      const scale = { 3: 1, 2: 0.62, 1: 0.2 }[zoomLevel];
+      const bounds = map.getBoundingClientRect();
+      const points = Object.entries(photos).map(([id, photo]) => ({
+        id,
+        photo,
+        x: ((photo.x / 100 - 0.5) * scale + 0.5) * bounds.width,
+        y: ((photo.y / 100 - 0.5) * scale + 0.5) * bounds.height
+      }));
+      const parents = points.map((_, index) => index);
+      const find = index => parents[index] === index ? index : (parents[index] = find(parents[index]));
+      const join = (left, right) => { parents[find(left)] = find(right); };
+
+      points.forEach((point, index) => {
+        points.slice(index + 1).forEach((other, offset) => {
+          const dx = Math.abs(point.x - other.x);
+          const dy = Math.abs(point.y - other.y);
+          if (dx <= 48 && dy <= 48) join(index, index + 1 + offset);
+        });
+      });
+
+      const grouped = new Map();
+      points.forEach((point, index) => {
+        const key = find(index);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(point);
+      });
+
+      individualMarkers.forEach(marker => { marker.hidden = true; });
+      clusterLayer.replaceChildren();
+      grouped.forEach(group => {
+        const center = group.reduce((sum, point) => ({ x: sum.x + point.x / group.length, y: sum.y + point.y / group.length }), { x: 0, y: 0 });
+        if (group.length === 1) {
+          const marker = document.querySelector(`.individual-marker[data-photo="${group[0].id}"]`);
+          marker.style.left = `${center.x}px`;
+          marker.style.top = `${center.y}px`;
+          marker.hidden = false;
+          return;
+        }
+
+        const latest = group.reduce((newest, point) => point.photo.order > newest.photo.order ? point : newest, group[0]);
+        const position = document.createElement("div");
+        position.className = "marker-position cluster-position";
+        position.style.left = `${center.x}px`;
+        position.style.top = `${center.y}px`;
+        const marker = document.createElement("button");
+        marker.type = "button";
+        marker.className = "map-marker cluster-marker";
+        marker.dataset.members = group.map(point => point.id).join(",");
+        marker.setAttribute("aria-label", `Show latest photo in group of ${group.length}`);
+        marker.innerHTML = `<span class="marker-image"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" style="background:${latest.photo.background}"></span><span class="marker-pointer"></span><span class="marker-count">${group.length}</span>`;
+        marker.addEventListener("click", () => showPhotos(group.map(point => point.id), marker));
+        position.append(marker);
+        clusterLayer.append(position);
+      });
+
+      zoomLevelLabel.textContent = `${zoomLevel} / 3`;
+      zoomIn.disabled = zoomLevel === 3;
+      zoomOut.disabled = zoomLevel === 1;
+    }
+
+    zoomIn.addEventListener("click", () => {
+      if (zoomLevel < 3) { zoomLevel += 1; renderZoom(); }
+    });
+    zoomOut.addEventListener("click", () => {
+      if (zoomLevel > 1) { zoomLevel -= 1; renderZoom(); }
+    });
+
+    function returnToDefault() {
+      mapPhoto.hidden = true;
+      defaultTrail.hidden = false;
+      selectedPhoto.hidden = true;
+      actions.hidden = false;
+      photoTrack.replaceChildren();
+      sliderControls.hidden = true;
+      document.querySelectorAll(".map-marker").forEach(marker => marker.removeAttribute("data-selected"));
+    }
+
+    function showPhotos(photoIds, marker) {
+      activePhotoIds = [...photoIds].sort((left, right) => photos[right].order - photos[left].order);
+      activePhotoIndex = 0;
+      photoTrack.replaceChildren();
+      activePhotoIds.forEach(id => {
+        const photo = photos[id];
+        const slide = document.createElement("button");
+        slide.type = "button";
+        slide.className = "trail-image";
+        slide.style.background = photo.background;
+        slide.setAttribute("aria-label", `Tap ${photo.location} image to return to Your Trail`);
+        slide.addEventListener("click", returnToDefault);
+        photoTrack.append(slide);
+      });
+
+      document.querySelectorAll(".map-marker").forEach(item => item.removeAttribute("data-selected"));
+      marker.setAttribute("data-selected", "true");
+      const newestPhoto = photos[activePhotoIds[0]];
+      document.querySelector(".map-photo-title").textContent = newestPhoto.location;
+      document.querySelector(".map-photo-hint").textContent = activePhotoIds.length > 1 ? `Latest image · ${activePhotoIds.length} photos` : "Photo selected";
+      mapPhotoThumb.style.background = newestPhoto.background;
+
+      mapPhoto.hidden = false;
+      defaultTrail.hidden = true;
+      selectedPhoto.hidden = false;
+      actions.hidden = true;
+      sliderControls.hidden = activePhotoIds.length < 2;
+      photoTrack.scrollLeft = 0;
+      renderActivePhoto();
+    }
+
+    function renderActivePhoto() {
+      const photo = photos[activePhotoIds[activePhotoIndex]];
+      if (!photo) return;
+      document.querySelector(".photo-note-title").textContent = photo.note || "No note was added for this photo.";
+      document.querySelector(".photo-location").textContent = photo.location;
+      document.querySelector(".photo-date").textContent = photo.date;
+      slideCount.textContent = `${activePhotoIndex + 1} / ${activePhotoIds.length}`;
+      slideNewer.disabled = activePhotoIndex === 0;
+      slideOlder.disabled = activePhotoIndex === activePhotoIds.length - 1;
+    }
+
+    function moveSlide(direction) {
+      const nextIndex = Math.max(0, Math.min(activePhotoIds.length - 1, activePhotoIndex + direction));
+      activePhotoIndex = nextIndex;
+      renderActivePhoto();
+      photoTrack.scrollTo({ left: nextIndex * photoTrack.clientWidth, behavior: "smooth" });
+    }
+
+    photoTrack.addEventListener("scroll", () => {
+      if (!activePhotoIds.length) return;
+      activePhotoIndex = Math.max(0, Math.min(activePhotoIds.length - 1, Math.round(photoTrack.scrollLeft / Math.max(1, photoTrack.clientWidth))));
+      renderActivePhoto();
+    });
+    slideNewer.addEventListener("click", () => moveSlide(-1));
+    slideOlder.addEventListener("click", () => moveSlide(1));
+    individualMarkers.forEach(position => position.querySelector(".map-marker").addEventListener("click", event => showPhotos([position.dataset.photo], event.currentTarget)));
+    renderZoom();
+  </script>
+</body>
+</html>
