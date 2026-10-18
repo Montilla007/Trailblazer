@@ -1,0 +1,49 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Trailblazer — Debug (Real GPS)",
+      "type": "dart",
+      "request": "launch",
+      "program": "trailblazer/lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
+    },
+    {
+      "name": "Trailblazer — Debug (Simulated Movement)",
+      "type": "dart",
+      "request": "launch",
+      "program": "trailblazer/lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=true"]
+    },
+    {
+      "name": "Trailblazer — Profile (Real GPS)",
+      "type": "dart",
+      "request": "launch",
+      "program": "trailblazer/lib/main.dart",
+      "flutterMode": "profile",
+      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
+    },
+    {
+      "name": "Trailblazer — Release (Real GPS)",
+      "type": "dart",
+      "request": "launch",
+      "program": "trailblazer/lib/main.dart",
+      "flutterMode": "release",
+      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
+    },
+    {
+      "name": "Trailblazer — Release (Simulated Movement)",
+      "type": "dart",
+      "request": "launch",
+      "program": "trailblazer/lib/main.dart",
+      "flutterMode": "release",
+      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=true"]
+    }
+  ]
+}

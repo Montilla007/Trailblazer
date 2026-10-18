@@ -11,4 +11,9 @@ class LocationRepositoryImpl implements LocationRepository {
   Future<GeoPoint> getCurrentLocation() {
     return _dataSource.getCurrentLocation();
   }
+
+  @override
+  Stream<GeoPoint> getLocationUpdates() {
+    return _dataSource.getLocationUpdates();
+  }
 }

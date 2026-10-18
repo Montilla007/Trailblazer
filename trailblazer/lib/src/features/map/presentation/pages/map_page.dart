@@ -8,15 +8,32 @@ import '../cubit/map_state.dart';
 import '../../domain/repositories/location_repository.dart';
 import '../../domain/usecases/get_current_location.dart';
 
+import '../../../../core/config/app_config.dart';
+import '../../domain/entities/geo_point.dart';
+
+import '../../domain/usecases/watch_location_updates.dart';
+
 class MapPage extends StatelessWidget {
   const MapPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          MapCubit(GetCurrentLocation(context.read<LocationRepository>()))
-            ..loadCurrentLocation(),
+      create: (context) {
+        final repository = context.read<LocationRepository>();
+        final cubit = MapCubit(
+          GetCurrentLocation(repository),
+          WatchLocationUpdates(repository),
+        );
+
+        if (AppConfig.simulateMovement) {
+          cubit.startSimulation();
+        } else {
+          cubit.startRealLocationTracking();
+        }
+
+        return cubit;
+      },
       child: const _MapView(),
     );
   }
@@ -113,23 +130,122 @@ class _MapCanvas extends StatefulWidget {
 class _MapCanvasState extends State<_MapCanvas> {
   MapLibreMapController? _controller;
 
+  Circle? _simulatedMarker;
+  bool _styleLoaded = false;
+
+  Line? _trailLine;
+
+  @override
+  void didUpdateWidget(covariant _MapCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.state.location != widget.state.location) {
+      if (widget.state.isSimulated) {
+        _syncSimulatedMarker(widget.state.location);
+      } else {
+        _followRealLocation(widget.state.location);
+      }
+    }
+
+    if (oldWidget.state.trailPoints != widget.state.trailPoints) {
+      _syncTrail(widget.state.trailPoints);
+    }
+  }
+
+  Future<void> _followRealLocation(GeoPoint? location) async {
+    final controller = _controller;
+
+    if (!_styleLoaded || controller == null || location == null) return;
+
+    await controller.animateCamera(
+      CameraUpdate.newLatLng(LatLng(location.latitude, location.longitude)),
+      duration: const Duration(milliseconds: 1800),
+    );
+  }
+
+  Future<void> _syncTrail(List<GeoPoint> points) async {
+    final controller = _controller;
+
+    if (!_styleLoaded || controller == null) return;
+
+    if (points.length < 2) {
+      if (_trailLine != null) {
+        await controller.removeLine(_trailLine!);
+        _trailLine = null;
+      }
+      return;
+    }
+
+    final options = LineOptions(
+      geometry: points
+          .map((point) => LatLng(point.latitude, point.longitude))
+          .toList(),
+      lineColor: '#28664A',
+      lineWidth: 4,
+      lineOpacity: 0.85,
+    );
+
+    if (_trailLine == null) {
+      _trailLine = await controller.addLine(options);
+    } else {
+      await controller.updateLine(_trailLine!, options);
+    }
+  }
+
+  Future<void> _syncSimulatedMarker(GeoPoint? location) async {
+    final controller = _controller;
+
+    if (!_styleLoaded || controller == null || location == null) return;
+
+    final options = CircleOptions(
+      geometry: LatLng(location.latitude, location.longitude),
+      circleRadius: 9,
+      circleColor: '#28664A',
+      circleStrokeColor: '#FFFFFF',
+      circleStrokeWidth: 3,
+    );
+
+    if (_simulatedMarker == null) {
+      _simulatedMarker = await controller.addCircle(options);
+    } else {
+      await controller.updateCircle(_simulatedMarker!, options);
+    }
+
+    await controller.animateCamera(
+      CameraUpdate.newLatLng(LatLng(location.latitude, location.longitude)),
+      duration: const Duration(milliseconds: 1800),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final location = widget.state.location;
 
+    final accuracy = location?.accuracyMeters;
+
     final gpsColor = switch (widget.state.status) {
       MapStatus.loadingLocation => Colors.amber,
-      MapStatus.ready => Colors.green,
       MapStatus.locationError => Colors.red,
+      MapStatus.ready when accuracy == null => Colors.amber,
+      MapStatus.ready when accuracy! <= 10 => Colors.green,
+      MapStatus.ready when accuracy! <= 30 => Colors.amber,
+      MapStatus.ready => Colors.red,
     };
 
-    final gpsLabel = switch (widget.state.status) {
-      MapStatus.loadingLocation => 'Finding location',
-      MapStatus.ready => 'Location found',
-      MapStatus.locationError => 'Location unavailable',
-    };
+    final gpsLabel = widget.state.isSimulated
+        ? 'Simulated movement'
+        : switch (widget.state.status) {
+            MapStatus.loadingLocation => 'Finding location',
+            MapStatus.locationError => 'Location unavailable',
+            MapStatus.ready when accuracy == null => 'GPS accuracy unknown',
+            MapStatus.ready when accuracy! <= 10 =>
+              'Strong GPS · ±${accuracy.toStringAsFixed(0)} m',
+            MapStatus.ready when accuracy! <= 30 =>
+              'Fair GPS · ±${accuracy.toStringAsFixed(0)} m',
+            MapStatus.ready => 'Weak GPS · ±${accuracy!.toStringAsFixed(0)} m',
+          };
 
     return SizedBox(
       height: 460,
@@ -156,7 +272,7 @@ class _MapCanvasState extends State<_MapCanvas> {
                                   FilledButton(
                                     onPressed: () => context
                                         .read<MapCubit>()
-                                        .loadCurrentLocation(),
+                                        .startRealLocationTracking(),
                                     child: const Text('Retry'),
                                   ),
                                 ],
@@ -170,9 +286,15 @@ class _MapCanvasState extends State<_MapCanvas> {
                       ),
                       styleString:
                           'https://tiles.openfreemap.org/styles/liberty',
-                      myLocationEnabled: true,
+                      myLocationEnabled: !widget.state.isSimulated,
                       onMapCreated: (controller) {
                         _controller = controller;
+                        _syncSimulatedMarker(widget.state.location);
+                      },
+                      onStyleLoadedCallback: () {
+                        _styleLoaded = true;
+                        _syncSimulatedMarker(widget.state.location);
+                        _syncTrail(widget.state.trailPoints);
                       },
                     ),
             ),
