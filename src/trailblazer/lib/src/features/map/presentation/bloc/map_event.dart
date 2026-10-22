@@ -39,3 +39,15 @@ final class MapViewportFollowRequested extends MapEvent {
 final class MapViewportFollowPaused extends MapEvent {
   const MapViewportFollowPaused();
 }
+
+final class MapZoomInRequested extends MapEvent {
+  const MapZoomInRequested();
+}
+
+final class MapZoomOutRequested extends MapEvent {
+  const MapZoomOutRequested();
+}
+
+final class MapPitchToggled extends MapEvent {
+  const MapPitchToggled();
+}

@@ -62,6 +62,18 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapViewportFollowPaused>((event, emit) {
       emit(state.copyWith(viewportMode: MapViewportMode.idle));
     });
+
+    on<MapZoomInRequested>((event, emit) {
+      emit(state.copyWith(zoom: (state.zoom + 1).clamp(3.0, 20.0).toDouble()));
+    });
+
+    on<MapZoomOutRequested>((event, emit) {
+      emit(state.copyWith(zoom: (state.zoom - 1).clamp(3.0, 20.0).toDouble()));
+    });
+
+    on<MapPitchToggled>((event, emit) {
+      emit(state.copyWith(pitch: state.pitch == 0 ? 45 : 0));
+    });
   }
 
   final WatchLocationUpdates _watchLocationUpdates;

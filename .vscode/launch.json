@@ -12,7 +12,7 @@
       "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "debug",
       "toolArgs": [
-        //"--dart-define=SIMULATE_MOVEMENT=false",
+        "--dart-define=SIMULATE_MOVEMENT=false",
         "--dart-define=ACCESS_TOKEN=${env:MAPBOX_ACCESS_TOKEN}"
       ]
     },
