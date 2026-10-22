@@ -6,5 +6,7 @@ class WatchLocationUpdates {
 
   final LocationRepository _repository;
 
-  Stream<GeoPoint> call() => _repository.getLocationUpdates();
+  Stream<GeoPoint> call() {
+    return _repository.watchLocation();
+  }
 }

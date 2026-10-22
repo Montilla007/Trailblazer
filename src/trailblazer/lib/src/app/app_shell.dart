@@ -11,11 +11,6 @@ class AppShell extends StatelessWidget {
   static const _pages = [
     MapPage(),
     PlaceholderPage(
-      icon: Icons.map_outlined,
-      title: 'Map',
-      message: 'The map will be added after the app foundation.',
-    ),
-    PlaceholderPage(
       icon: Icons.photo_library_outlined,
       title: 'Album',
       message: 'Your photo collection will appear here.',
@@ -43,14 +38,10 @@ class AppShell extends StatelessWidget {
               const SizedBox(width: 8),
             ],
           ),
-          body: IndexedStack(
-            index: selectedIndex,
-            children: _pages,
-          ),
+          body: IndexedStack(index: selectedIndex, children: _pages),
           bottomNavigationBar: NavigationBar(
             selectedIndex: selectedIndex,
-            onDestinationSelected:
-                context.read<NavigationCubit>().selectTab,
+            onDestinationSelected: context.read<NavigationCubit>().selectTab,
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.map_outlined),
@@ -104,10 +95,7 @@ class AppShell extends StatelessWidget {
                     Icons.lock_outline_rounded,
                     'Privacy & storage',
                   ),
-                  _inactiveMenuItem(
-                    Icons.info_outline_rounded,
-                    'About & help',
-                  ),
+                  _inactiveMenuItem(Icons.info_outline_rounded, 'About & help'),
                 ],
               ),
             );
@@ -118,10 +106,6 @@ class AppShell extends StatelessWidget {
   }
 
   Widget _inactiveMenuItem(IconData icon, String label) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      onTap: () {},
-    );
+    return ListTile(leading: Icon(icon), title: Text(label), onTap: () {});
   }
 }

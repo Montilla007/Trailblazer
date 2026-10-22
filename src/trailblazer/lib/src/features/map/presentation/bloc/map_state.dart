@@ -1,0 +1,53 @@
+enum MapStatus {
+  initial,
+  tracking,
+  stopped,
+  error,
+}
+
+enum MapViewportMode {
+  idle,
+  followingPuck,
+}
+
+class MapState {
+  const MapState({
+    this.status = MapStatus.initial,
+    this.latitude,
+    this.longitude,
+    this.accuracyMeters,
+    this.errorMessage,
+    this.viewportMode = MapViewportMode.idle,
+  });
+
+  final MapStatus status;
+  final double? latitude;
+  final double? longitude;
+  final double? accuracyMeters;
+  final String? errorMessage;
+  final MapViewportMode viewportMode;
+
+  MapState copyWith({
+    MapStatus? status,
+    double? latitude,
+    double? longitude,
+    double? accuracyMeters,
+    String? errorMessage,
+    MapViewportMode? viewportMode,
+    bool clearAccuracyMeters = false,
+    bool clearErrorMessage = false,
+  }) {
+    return MapState(
+      status: status ?? this.status,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      accuracyMeters: clearAccuracyMeters
+          ? null
+          : accuracyMeters ?? this.accuracyMeters,
+      errorMessage: clearErrorMessage
+          ? null
+          : errorMessage ?? this.errorMessage,
+      viewportMode: viewportMode ?? this.viewportMode,
+    );
+  }
+}

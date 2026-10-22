@@ -11,7 +11,10 @@
       "request": "launch",
       "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "debug",
-      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
+      "toolArgs": [
+        //"--dart-define=SIMULATE_MOVEMENT=false",
+        "--dart-define=ACCESS_TOKEN=${env:MAPBOX_ACCESS_TOKEN}"
+      ]
     },
     {
       "name": "Trailblazer — Debug (Simulated Movement)",
@@ -19,7 +22,10 @@
       "request": "launch",
       "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "debug",
-      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=true"]
+      "toolArgs": [
+        "--dart-define=SIMULATE_MOVEMENT=true",
+        "--dart-define=ACCESS_TOKEN=${env:MAPBOX_ACCESS_TOKEN}"
+      ]
     },
     {
       "name": "Trailblazer — Profile (Real GPS)",
@@ -27,7 +33,10 @@
       "request": "launch",
       "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "profile",
-      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
+      "toolArgs": [
+        "--dart-define=SIMULATE_MOVEMENT=false",
+        "--dart-define=ACCESS_TOKEN=${env:MAPBOX_ACCESS_TOKEN}"
+      ]
     },
     {
       "name": "Trailblazer — Release (Real GPS)",
@@ -35,7 +44,10 @@
       "request": "launch",
       "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "release",
-      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=false"]
+      "toolArgs": [
+        "--dart-define=SIMULATE_MOVEMENT=false",
+        "--dart-define=ACCESS_TOKEN=${env:MAPBOX_ACCESS_TOKEN}"
+      ]
     },
     {
       "name": "Trailblazer — Release (Simulated Movement)",
@@ -43,7 +55,10 @@
       "request": "launch",
       "program": "src/trailblazer/lib/main.dart",
       "flutterMode": "release",
-      "toolArgs": ["--dart-define=SIMULATE_MOVEMENT=true"]
+      "toolArgs": [
+        "--dart-define=SIMULATE_MOVEMENT=true",
+        "--dart-define=ACCESS_TOKEN=${env:MAPBOX_ACCESS_TOKEN}"
+      ]
     }
   ]
 }
