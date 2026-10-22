@@ -1,14 +1,6 @@
-enum MapStatus {
-  initial,
-  tracking,
-  stopped,
-  error,
-}
+enum MapStatus { initial, tracking, stopped, error }
 
-enum MapViewportMode {
-  idle,
-  followingPuck,
-}
+enum MapViewportMode { idle, followingPuck }
 
 class MapState {
   const MapState({
@@ -18,6 +10,8 @@ class MapState {
     this.accuracyMeters,
     this.errorMessage,
     this.viewportMode = MapViewportMode.idle,
+    this.zoom = 15,
+    this.pitch = 0,
   });
 
   final MapStatus status;
@@ -26,6 +20,8 @@ class MapState {
   final double? accuracyMeters;
   final String? errorMessage;
   final MapViewportMode viewportMode;
+  final double zoom;
+  final double pitch;
 
   MapState copyWith({
     MapStatus? status,
@@ -34,6 +30,8 @@ class MapState {
     double? accuracyMeters,
     String? errorMessage,
     MapViewportMode? viewportMode,
+    double? zoom,
+    double? pitch,
     bool clearAccuracyMeters = false,
     bool clearErrorMessage = false,
   }) {
@@ -48,6 +46,8 @@ class MapState {
           ? null
           : errorMessage ?? this.errorMessage,
       viewportMode: viewportMode ?? this.viewportMode,
+      zoom: zoom ?? this.zoom,
+      pitch: pitch ?? this.pitch,
     );
   }
 }

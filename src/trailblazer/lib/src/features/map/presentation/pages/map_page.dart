@@ -34,7 +34,6 @@ class _MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<_MapView> {
-  
   final ViewportController _viewportController = ViewportController();
   final List<StreamSubscription<dynamic>> _gestureSubscriptions = [];
   final FollowPuckViewportState _followPuckViewport = FollowPuckViewportState(
@@ -50,14 +49,33 @@ class _MapViewState extends State<_MapView> {
   Widget build(BuildContext context) {
     return BlocListener<MapBloc, MapState>(
       listenWhen: (previous, current) =>
-          previous.viewportMode != current.viewportMode,
+          previous.viewportMode != current.viewportMode ||
+          previous.zoom != current.zoom ||
+          previous.pitch != current.pitch,
       listener: (context, state) {
         final shouldFollow =
             state.viewportMode == MapViewportMode.followingPuck;
 
-        _viewportController.moveTo(
-          shouldFollow ? _followPuckViewport : const IdleViewportState(),
-          transition: shouldFollow ? const DefaultViewportTransition() : null,
+        if (shouldFollow) {
+          _viewportController.moveTo(
+            FollowPuckViewportState(
+              zoom: state.zoom,
+              bearing: FollowPuckViewportStateBearingConstant(0),
+              pitch: state.pitch,
+            ),
+            transition: const DefaultViewportTransition(),
+          );
+          return;
+        }
+
+        final map = _mapboxMap;
+        if (map == null) return;
+
+        unawaited(
+          map.easeTo(
+            CameraOptions(zoom: state.zoom, pitch: state.pitch),
+            MapAnimationOptions(duration: 300),
+          ),
         );
       },
       child: SizedBox.expand(
@@ -76,15 +94,59 @@ class _MapViewState extends State<_MapView> {
               Positioned(
                 right: 16,
                 bottom: 16,
-                child: FloatingActionButton.small(
-                  heroTag: 'map-recenter',
-                  tooltip: 'Recenter on my location',
-                  onPressed: () {
-                    context.read<MapBloc>().add(
-                      const MapViewportFollowRequested(),
+                child: BlocBuilder<MapBloc, MapState>(
+                  builder: (context, state) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FloatingActionButton.small(
+                          heroTag: 'map-pitch',
+                          tooltip: state.pitch == 0
+                              ? 'Switch to 3D view'
+                              : 'Switch to 2D view',
+                          onPressed: () {
+                            context.read<MapBloc>().add(
+                              const MapPitchToggled(),
+                            );
+                          },
+                          child: Text(state.pitch == 0 ? '3D' : '2D'),
+                        ),
+                        const SizedBox(height: 8),
+                        FloatingActionButton.small(
+                          heroTag: 'map-zoom-in',
+                          tooltip: 'Zoom in',
+                          onPressed: () {
+                            context.read<MapBloc>().add(
+                              const MapZoomInRequested(),
+                            );
+                          },
+                          child: const Icon(Icons.add),
+                        ),
+                        const SizedBox(height: 8),
+                        FloatingActionButton.small(
+                          heroTag: 'map-zoom-out',
+                          tooltip: 'Zoom out',
+                          onPressed: () {
+                            context.read<MapBloc>().add(
+                              const MapZoomOutRequested(),
+                            );
+                          },
+                          child: const Icon(Icons.remove),
+                        ),
+                        const SizedBox(height: 8),
+                        FloatingActionButton.small(
+                          heroTag: 'map-recenter',
+                          tooltip: 'Recenter on my location',
+                          onPressed: () {
+                            context.read<MapBloc>().add(
+                              const MapViewportFollowRequested(),
+                            );
+                          },
+                          child: const Icon(Icons.my_location),
+                        ),
+                      ],
                     );
                   },
-                  child: const Icon(Icons.my_location),
                 ),
               ),
             ],
