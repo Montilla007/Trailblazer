@@ -9,6 +9,7 @@ import './src/app/trailblazer_app.dart'; // Adjust to your actual app import.
 void main() {
   runZonedGuarded(
     () async {
+      // TODO: #9 Fix the Access Token issue. For now, we are using the .env file to load the token.
       WidgetsFlutterBinding.ensureInitialized();
       await dotenv.load(fileName: '.env');
 
