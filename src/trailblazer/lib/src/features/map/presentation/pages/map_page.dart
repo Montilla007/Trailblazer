@@ -11,6 +11,8 @@ import 'package:trailblazer/src/features/map/presentation/bloc/map_state.dart';
 
 import '../bloc/map_bloc.dart';
 
+import 'package:trailblazer/src/shared/widgets/gps_accuracy_indicator.dart';
+
 class MapPage extends StatelessWidget {
   const MapPage({super.key});
 
@@ -91,6 +93,7 @@ class _MapViewState extends State<_MapView> {
                   },
                 ),
               ),
+              Positioned(top: 16, left: 16, child: GpsAccuracyIndicator()),
               Positioned(
                 right: 16,
                 bottom: 16,
