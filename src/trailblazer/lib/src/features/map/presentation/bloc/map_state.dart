@@ -1,3 +1,5 @@
+import '../../domain/entities/geo_point.dart';
+
 enum MapStatus { initial, tracking, stopped, error }
 
 enum MapViewportMode { idle, followingPuck }
@@ -12,6 +14,7 @@ class MapState {
     this.viewportMode = MapViewportMode.idle,
     this.zoom = 15,
     this.pitch = 0,
+    this.trailPoints = const [],
   });
 
   final MapStatus status;
@@ -22,7 +25,7 @@ class MapState {
   final MapViewportMode viewportMode;
   final double zoom;
   final double pitch;
-
+  final List<GeoPoint> trailPoints;
   MapState copyWith({
     MapStatus? status,
     double? latitude,
@@ -32,6 +35,7 @@ class MapState {
     MapViewportMode? viewportMode,
     double? zoom,
     double? pitch,
+    List<GeoPoint>? trailPoints,
     bool clearAccuracyMeters = false,
     bool clearErrorMessage = false,
   }) {
@@ -48,6 +52,7 @@ class MapState {
       viewportMode: viewportMode ?? this.viewportMode,
       zoom: zoom ?? this.zoom,
       pitch: pitch ?? this.pitch,
+      trailPoints: trailPoints ?? this.trailPoints,
     );
   }
 }

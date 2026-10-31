@@ -12,7 +12,14 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapTrackingRequested>((event, emit) async {
       await _locationSubscription?.cancel();
 
-      emit(const MapState(status: MapStatus.tracking));
+      // MapTrackingRequested
+      emit(
+        state.copyWith(
+          status: MapStatus.tracking,
+          clearAccuracyMeters: true,
+          clearErrorMessage: true,
+        ),
+      );
 
       _locationSubscription = _watchLocationUpdates().listen(
         (point) {
@@ -74,10 +81,22 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapPitchToggled>((event, emit) {
       emit(state.copyWith(pitch: state.pitch == 0 ? 45 : 0));
     });
+    on<MapPuckPositionSampled>((event, emit) {
+      final point = GeoPoint(
+        latitude: event.latitude,
+        longitude: event.longitude,
+        timestamp: DateTime.now(),
+      );
+
+      _trailPoints.add(point);
+
+      emit(state.copyWith(trailPoints: List.unmodifiable(_trailPoints)));
+    });
   }
 
   final WatchLocationUpdates _watchLocationUpdates;
   StreamSubscription<GeoPoint>? _locationSubscription;
+  final List<GeoPoint> _trailPoints = [];
 
   @override
   Future<void> close() async {

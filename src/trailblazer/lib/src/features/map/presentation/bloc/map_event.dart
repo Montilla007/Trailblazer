@@ -51,3 +51,13 @@ final class MapZoomOutRequested extends MapEvent {
 final class MapPitchToggled extends MapEvent {
   const MapPitchToggled();
 }
+
+final class MapPuckPositionSampled extends MapEvent {
+  const MapPuckPositionSampled({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final double latitude;
+  final double longitude;
+}
