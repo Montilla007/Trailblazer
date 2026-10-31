@@ -7,7 +7,7 @@ class DeviceLocationDataSource {
     yield* Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
+        distanceFilter: 0,
       ),
     );
   }
