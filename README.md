@@ -9,6 +9,8 @@
 **Storage:** On the user's device  
 **Backend:** None for now
 
+**Current implementation snapshot:** Mapbox map and puck controls are in place; local daily route storage is being developed and still needs end-to-end verification. Album and History remain placeholders.
+
 ## Purpose
 
 Trailblazer is a personal location-history app. It records where the user has been and displays the current location and previous route on a map. Photos appear as map markers at their associated locations.
@@ -60,27 +62,28 @@ Trailblazer is a personal location-history app. It records where the user has be
 - Flutter with Dart for the app.
 - Android is the initial and only target platform in scope.
 - Keep Dart application code in the project-level `src` directory. Retain the Flutter-generated `lib/main.dart` entry point and delegate from it into `src` so Flutter tooling can launch the app.
-- Use MapLibre for map rendering, with a Flutter integration backed by MapLibre Native on Android.
+- Use Mapbox Maps Flutter for map rendering. Mapbox is the selected map SDK, and the unused MapLibre package has been removed.
+- Use Geolocator for the phone location stream and GPS accuracy data.
+- Use Drift with SQLite for local route history, grouped by local calendar day. Store timestamps in UTC and keep an increasing sequence for points within each day.
 - Local-first data with no backend.
 - Photos remain in the phone's Camera album; Trailblazer references them and maintains its own in-app album.
 
 ### Proposed, not yet agreed
 
-- The Flutter package and integration details for location, camera/media access, notifications, biometric/device authentication, and MapLibre.
-- The local persistence package and data-migration approach for locations, photo references, and notes.
+- Flutter integrations for camera/media access, notifications, and biometric/device authentication.
+- The data model and migration plan for future photo references, notes, and related metadata.
 
 ### Map data
 
-- OpenFreeMap is the proposed source for online map tiles.
-- Offline regions require a map data source whose terms explicitly permit offline downloads. Confirm the provider and applicable terms before implementing offline downloads.
+- The current app uses Mapbox Maps Flutter for online map rendering.
+- Offline regions remain a planned feature. Confirm Mapbox SDK capability, account limits, offline terms, attribution, storage needs, and update behavior before implementing downloads.
 - Map tile requests disclose the approximate area being viewed to the tile provider; do not send the user's stored route, photo records, or notes to a map provider.
 
 ## Open questions
 
-- Confirm Flutter package choices and Android platform integrations for location, media, notifications, and biometric/device authentication.
-- Select a MapLibre Flutter integration and confirm the map features needed by Trailblazer, including offline-region support, before implementation.
-- Select a local persistence package and data-migration approach for the Flutter app.
-- Select an offline map data source and confirm its download terms, attribution, storage needs, and update approach.
+- Confirm Android platform integrations for media access, notifications, and biometric/device authentication.
+- Confirm the offline map approach and Mapbox terms/account constraints before implementing offline downloads.
+- Define the data model and migration approach for photo references and notes.
 - Define how long a confirmed location remains eligible as the fallback for a photo without GPS metadata.
 - Decide what Trailblazer should do with its note and location association when a photo is removed from the in-app album.
 - Confirm the target Android SDK version and the exact permission flow for background location, Camera album access, photo-location metadata, and notifications. Android 13 (API 33) is the agreed minimum.

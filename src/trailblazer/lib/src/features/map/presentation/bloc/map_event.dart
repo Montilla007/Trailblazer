@@ -56,8 +56,12 @@ final class MapPuckPositionSampled extends MapEvent {
   const MapPuckPositionSampled({
     required this.latitude,
     required this.longitude,
+    required this.sampledAt,
+    this.accuracyMeters,
   });
 
   final double latitude;
   final double longitude;
+  final DateTime sampledAt;
+  final double? accuracyMeters;
 }

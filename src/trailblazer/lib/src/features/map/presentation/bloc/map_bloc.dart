@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:trailblazer/src/features/map/domain/services/route_point_sampling_filter.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
 
 import '../../domain/entities/geo_point.dart';
 import '../../domain/usecases/watch_location_updates.dart';
@@ -8,7 +10,8 @@ import 'map_event.dart';
 import 'map_state.dart';
 
 class MapBloc extends Bloc<MapEvent, MapState> {
-  MapBloc(this._watchLocationUpdates) : super(const MapState()) {
+  MapBloc(this._watchLocationUpdates, this._saveRoutePoint)
+    : super(const MapState()) {
     on<MapTrackingRequested>((event, emit) async {
       await _locationSubscription?.cancel();
 
@@ -81,22 +84,37 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapPitchToggled>((event, emit) {
       emit(state.copyWith(pitch: state.pitch == 0 ? 45 : 0));
     });
-    on<MapPuckPositionSampled>((event, emit) {
-      final point = GeoPoint(
-        latitude: event.latitude,
-        longitude: event.longitude,
-        timestamp: DateTime.now(),
-      );
-
-      _trailPoints.add(point);
-
-      emit(state.copyWith(trailPoints: List.unmodifiable(_trailPoints)));
-    });
+    on<MapPuckPositionSampled>(_onPuckPositionSampled);
   }
 
   final WatchLocationUpdates _watchLocationUpdates;
   StreamSubscription<GeoPoint>? _locationSubscription;
   final List<GeoPoint> _trailPoints = [];
+
+  final SaveRoutePoint _saveRoutePoint;
+  final RoutePointSamplingFilter _samplingFilter = RoutePointSamplingFilter();
+
+  Future<void> _onPuckPositionSampled(
+    MapPuckPositionSampled event,
+    Emitter<MapState> emit,
+  ) async {
+    final sampledPoint = GeoPoint(
+      latitude: event.latitude,
+      longitude: event.longitude,
+      accuracyMeters: event.accuracyMeters,
+      timestamp: event.sampledAt,
+    );
+
+    // The filter decides whether this sample is worth saving.
+    if (_samplingFilter.shouldSave(sampledPoint)) {
+      await _saveRoutePoint(sampledPoint);
+    }
+
+    // Keep your existing live-trail update here.
+    // For example, if you currently add every puck sample to _trailPoints:
+    _trailPoints.add(sampledPoint);
+    emit(state.copyWith(trailPoints: List.unmodifiable(_trailPoints)));
+  }
 
   @override
   Future<void> close() async {

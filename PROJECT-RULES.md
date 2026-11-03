@@ -17,8 +17,8 @@ Add or update rules here when the project requires a decision or constraint that
 
 - Build the Android app with Flutter and Dart. Android is the only target platform in scope unless the user changes scope.
 - Keep Dart application code in the project-level `src` directory. Retain Flutter's `lib/main.dart` entry point and delegate from it into `src` for compatibility with Flutter tooling.
-- Use MapLibre for map rendering through a Flutter integration backed by MapLibre Native on Android. Confirm the specific integration and its required capabilities before relying on it.
-- Keep Flutter package choices for local persistence and Android platform integrations open until confirmed.
+- Use Mapbox Maps Flutter for map rendering. MapLibre is no longer the selected map engine, and the unused maplibre_gl dependency has been removed after confirming no code or platform configuration relied on it.
+- Use Drift with SQLite for on-device route history. Keep table definitions in the data layer and do not hand-edit generated Drift files.
 - Support Android 13 (API 33) and newer. Keep the target Android SDK version as an open decision until it is confirmed.
 - Keep the architecture small and responsibility-focused.
 - Keep app data local. Do not add a backend, user accounts, cloud sync, or remote photo storage unless the user requests a scope change.
@@ -53,6 +53,8 @@ For projects with an API, record project-specific conventions such as:
 
 - Use both movement and elapsed time to request/record location updates. The initial target is about 10 meters or 30 seconds, whichever comes first; treat these as tunable starting values.
 - Persist confirmed locations on-device and retain timestamps and available accuracy information.
+- For the current route-storage work, sample the Mapbox location puck for the displayed live trail, then save only samples accepted by RoutePointSamplingFilter. The current filter defaults are adjustable starting values, not fixed product requirements.
+- Group persisted route points by the device's local calendar date. Store each point's timestamp in UTC and preserve sequence order within its route day.
 - When GPS updates stop, keep the last confirmed point as historical data; do not silently present it as a fresh fix.
 - For a photo without GPS metadata, use the most recent suitable confirmed app location recorded before capture and mark the association approximate. The age limit for a "suitable" location remains an open decision; do not invent one.
 - If no suitable confirmed location exists, keep the photo without a map location and allow manual placement later.
@@ -67,8 +69,8 @@ For projects with an API, record project-specific conventions such as:
 
 ### Maps and offline regions
 
-- Use the agreed MapLibre engine for the map UI, route trail, and photo markers through the selected Flutter integration.
-- OpenFreeMap is only a proposed online tile source; confirm its terms and availability before depending on it.
+- Use the agreed Mapbox engine for the map UI, route trail, and photo markers.
+- Treat offline map downloads as a separate decision. Confirm the selected Mapbox features, account limits, and offline terms before implementing downloads.
 - Before downloading offline regions, verify that the selected map-data provider permits offline downloads and follow its attribution, usage, and update requirements.
 - If tiles are unavailable offline, retain locally saved records and show the map's unavailable state without implying location history has been lost.
 
