@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
+import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/watch_location_updates.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_event.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_state.dart';
@@ -20,9 +22,10 @@ class MapPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       lazy: false,
-      create: (context) =>
-          MapBloc(WatchLocationUpdates(context.read<LocationRepository>()))
-            ..add(const MapTrackingRequested()),
+      create: (context) => MapBloc(
+        WatchLocationUpdates(context.read<LocationRepository>()),
+        SaveRoutePoint(context.read<RouteHistoryRepository>()),
+      )..add(const MapTrackingRequested()),
       child: const _MapView(),
     );
   }
@@ -177,13 +180,14 @@ class _MapViewState extends State<_MapView> {
   }
 
   Future<void> _onMapCreated(BuildContext context, MapboxMap mapboxMap) async {
+    final mapBloc = context.read<MapBloc>();
     _mapboxMap = mapboxMap;
 
     _panGestureSubscription = mapboxMap.gestures.pan.gestureEvents.listen((
       event,
     ) {
       if (event.gestureState == GestureState.started && mounted) {
-        context.read<MapBloc>().add(const MapViewportFollowPaused());
+        mapBloc.add(const MapViewportFollowPaused());
       }
     });
 
@@ -198,10 +202,11 @@ class _MapViewState extends State<_MapView> {
 
     if (!mounted) return;
 
-    context.read<MapBloc>().add(const MapViewportFollowRequested());
+    mapBloc.add(const MapViewportFollowRequested());
   }
 
   Future<void> _onStyleLoaded(BuildContext context) async {
+    final mapBloc = context.read<MapBloc>();
     final map = _mapboxMap;
     if (map == null || _trailSource != null) return;
 
@@ -224,9 +229,9 @@ class _MapViewState extends State<_MapView> {
     );
 
     _trailSource = source;
-    _startPuckSampling(context.read<MapBloc>());
+    _startPuckSampling(mapBloc);
 
-    await _updateTrail(context.read<MapBloc>().state.trailPoints);
+    await _updateTrail(mapBloc.state.trailPoints);
   }
 
   Future<void> _updateTrail(List<GeoPoint> points) async {
@@ -274,7 +279,7 @@ class _MapViewState extends State<_MapView> {
     _puckSampleInFlight = true;
 
     try {
-      final layer = await map.style.getLayer('mapbox-location-indicator-layer');
+      final layer = await map.getLayer('mapbox-location-indicator-layer');
 
       if (layer is! LocationIndicatorLayer) return;
 
@@ -285,6 +290,8 @@ class _MapViewState extends State<_MapView> {
         MapPuckPositionSampled(
           latitude: coordinates[0]!,
           longitude: coordinates[1]!,
+          sampledAt: DateTime.now().toUtc(),
+          accuracyMeters: bloc.state.accuracyMeters,
         ),
       );
     } finally {
