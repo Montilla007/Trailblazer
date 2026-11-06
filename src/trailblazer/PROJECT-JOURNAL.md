@@ -63,7 +63,7 @@ Current RoutePointSamplingFilter defaults in code are:
 - Require at least 2 meters movement to reduce stationary drift saves.
 - Compare direction using 3-meter heading segments and a 30-degree turn threshold.
 
-These are implementation starting values and may need field testing. The current filter returns a bool from shouldSave(point), so it saves the triggering sample. It does not preserve a buffered point at the exact bend.
+These are implementation starting values and may need field testing. The current filter returns a bool from shouldSave(point), so it saves the triggering sample. It does not preserve a buffered point at the exact bend. Saved routes render as a blue line only; a single saved point is not drawn as a circle.
 
 ## 4. Local route database
 
@@ -86,7 +86,7 @@ Issue #18 covers saving filtered route coordinates locally by day. The current d
 
 The Drift database is RouteDatabase. Table definitions are in data/datasources/route_database.dart; generated route_database.g.dart is tooling output and must not be edited manually. build.yaml configures Drift DateTime storage as text. RouteLocalDataSource creates/finds a day row, assigns the next sequence, saves a point, and reads a day's points ordered by sequence. RouteHistoryRepositoryImpl implements the domain contract. TrailblazerApp provides and closes the database and provides the route repository.
 
-SaveRoutePoint derives the local day and timezone offset from the puck sample timestamp before delegating to the repository. RoutePointSamplingFilter gates persistence in MapBloc. The database, repository read methods, and `GetRoutePointsForDay` use case are present; the route-read use case has not yet been wired into the UI.
+SaveRoutePoint derives the local day and timezone offset from the puck sample timestamp before delegating to the repository. RoutePointSamplingFilter gates persistence in MapBloc. The database, repository read methods, and route-read use cases are present. In debug builds, the Map panel loads all saved points at startup, draws them as one connected blue line in timestamp order, and refreshes the line after each successful save. It can also load a selected day and delete all saved route rows after confirmation.
 
 **Status:** storage code is present but still needs end-to-end verification. Do not treat issue #18 as finished until writes and reads have been checked on the running app.
 
@@ -158,6 +158,8 @@ Implemented in the current code:
 - GPS accuracy indicator driven by MapBloc location state.
 - Live trail drawn as a GeoJSON line, currently using green #28664A.
 - Puck samples sent to MapBloc, with filtered samples routed to local persistence.
+- Debug-only expandable panel for toggling live-trail visibility, displaying all saved route points as one connected line as SQLite writes arrive, loading a saved route by local date, and confirmed deletion of all persisted route history.
+- Live and loaded saved trails use separate map sources and layers.
 
 Needs verification or review:
 - The latest reported `flutter analyze` completed with no issues.

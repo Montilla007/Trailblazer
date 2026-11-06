@@ -38,6 +38,10 @@ that alternative.
 - Device location updates and GPS accuracy display.
 - Live trail rendering and sampled route-point persistence using Drift/SQLite;
   end-to-end route save/read behavior still needs verification.
+- Debug-build-only Map panel for live-trail visibility, loading all saved
+  routes as one connected blue line (refreshed after successful writes) or
+  loading an individual date, and
+  deleting all saved route history after confirmation.
 - Album and History screens are placeholders.
 
 Photo capture/import and associations, background recording, offline map
