@@ -15,9 +15,11 @@ class GpsAccuracyIndicator extends StatelessWidget {
     return BlocBuilder<MapBloc, MapState>(
       buildWhen: (previous, current) =>
           previous.accuracyMeters != current.accuracyMeters ||
+          previous.debugAccuracyMeters != current.debugAccuracyMeters ||
+          previous.debugAccuracyMode != current.debugAccuracyMode ||
           previous.status != current.status,
       builder: (context, state) {
-        final accuracy = state.accuracyMeters;
+        final accuracy = state.effectiveAccuracyMeters;
         final hasUsableAccuracy =
             state.status == MapStatus.tracking &&
             accuracy != null &&
@@ -60,10 +62,7 @@ class GpsAccuracyIndicator extends StatelessWidget {
             color: theme.colorScheme.surface.withValues(alpha: 0.94),
             borderRadius: BorderRadius.circular(24),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 9,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -73,16 +72,10 @@ class GpsAccuracyIndicator extends StatelessWidget {
                     color: indicatorColor,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: theme.textTheme.labelLarge,
-                  ),
+                  Text(label, style: theme.textTheme.labelLarge),
                   if (accuracyText != null) ...[
                     const SizedBox(width: 8),
-                    Text(
-                      accuracyText,
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    Text(accuracyText, style: theme.textTheme.bodySmall),
                   ],
                 ],
               ),

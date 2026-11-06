@@ -8,7 +8,9 @@ abstract interface class RouteHistoryRepository {
     required GeoPoint point,
   });
 
-  Future<List<RoutePoint>> getPointsForDay({
-    required String localDay,
-  });
+  Future<List<RoutePoint>> getPointsForDay({required String localDay});
+
+  Future<List<RoutePoint>> getAllPoints();
+
+  Future<void> deleteAllRoutes();
 }

@@ -1,3 +1,5 @@
+import 'map_state.dart';
+
 sealed class MapEvent {
   const MapEvent();
 }
@@ -52,6 +54,12 @@ final class MapPitchToggled extends MapEvent {
   const MapPitchToggled();
 }
 
+final class MapDebugAccuracyModeSelected extends MapEvent {
+  const MapDebugAccuracyModeSelected(this.mode);
+
+  final DebugAccuracyMode mode;
+}
+
 final class MapPuckPositionSampled extends MapEvent {
   const MapPuckPositionSampled({
     required this.latitude,
@@ -64,4 +72,26 @@ final class MapPuckPositionSampled extends MapEvent {
   final double longitude;
   final DateTime sampledAt;
   final double? accuracyMeters;
+}
+
+final class MapLiveTrailVisibilityToggled extends MapEvent {
+  const MapLiveTrailVisibilityToggled();
+}
+
+final class MapSavedTrailVisibilityToggled extends MapEvent {
+  const MapSavedTrailVisibilityToggled();
+}
+
+final class MapSavedTrailLoadRequested extends MapEvent {
+  const MapSavedTrailLoadRequested({required this.localDay});
+
+  final String localDay;
+}
+
+final class MapAllSavedTrailLoadRequested extends MapEvent {
+  const MapAllSavedTrailLoadRequested();
+}
+
+final class MapAllSavedRoutesDeleteRequested extends MapEvent {
+  const MapAllSavedRoutesDeleteRequested();
 }

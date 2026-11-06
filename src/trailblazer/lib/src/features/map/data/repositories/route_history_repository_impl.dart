@@ -25,4 +25,14 @@ class RouteHistoryRepositoryImpl implements RouteHistoryRepository {
   Future<List<RoutePoint>> getPointsForDay({required String localDay}) {
     return _localDataSource.getPointsForDay(localDay: localDay);
   }
+
+  @override
+  Future<List<RoutePoint>> getAllPoints() {
+    return _localDataSource.getAllPoints();
+  }
+
+  @override
+  Future<void> deleteAllRoutes() {
+    return _localDataSource.deleteAllRoutes();
+  }
 }

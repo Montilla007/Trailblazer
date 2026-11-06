@@ -17,15 +17,19 @@ class MapCanvas extends StatefulWidget {
 }
 
 class _MapCanvasState extends State<MapCanvas> {
-  static const _trailSourceId = 'recorded-trail-source';
-  static const _trailLayerId = 'recorded-trail-layer';
+  static const _liveTrailSourceId = 'live-trail-source';
+  static const _liveTrailLayerId = 'live-trail-layer';
+  static const _savedTrailSourceId = 'saved-trail-source';
+  static const _savedTrailLayerId = 'saved-trail-layer';
+  static const _savedTrailColor = Color(0xFF1976D2);
   static const _emptyFeatureCollection =
       '{"type":"FeatureCollection","features":[]}';
 
   final ViewportController _viewportController = ViewportController();
 
   MapboxMap? _mapboxMap;
-  GeoJsonSource? _trailSource;
+  GeoJsonSource? _liveTrailSource;
+  GeoJsonSource? _savedTrailSource;
   StreamSubscription<dynamic>? _panGestureSubscription;
   Timer? _puckSamplingTimer;
   bool _puckSampleInFlight = false;
@@ -65,9 +69,51 @@ class _MapCanvasState extends State<MapCanvas> {
         ),
         BlocListener<MapBloc, MapState>(
           listenWhen: (previous, current) =>
-              previous.trailPoints != current.trailPoints,
+              previous.trailPoints != current.trailPoints ||
+              previous.isLiveTrailVisible != current.isLiveTrailVisible,
           listener: (context, state) {
-            unawaited(_updateTrail(state.trailPoints));
+            unawaited(
+              _updateLiveTrail(
+                state.trailPoints,
+                visible: state.isLiveTrailVisible,
+              ),
+            );
+          },
+        ),
+        BlocListener<MapBloc, MapState>(
+          listenWhen: (previous, current) =>
+              previous.savedTrailPoints != current.savedTrailPoints,
+          listener: (context, state) {
+            unawaited(
+              _updateSavedTrail(
+                state.savedTrailPoints,
+                visible: state.isSavedTrailVisible,
+              ),
+            );
+          },
+        ),
+        BlocListener<MapBloc, MapState>(
+          listenWhen: (previous, current) =>
+              previous.savedTrailLocalDay != current.savedTrailLocalDay,
+          listener: (context, state) {
+            unawaited(
+              _displaySavedTrail(
+                state.savedTrailPoints,
+                visible: state.isSavedTrailVisible,
+              ),
+            );
+          },
+        ),
+        BlocListener<MapBloc, MapState>(
+          listenWhen: (previous, current) =>
+              previous.isSavedTrailVisible != current.isSavedTrailVisible,
+          listener: (context, state) {
+            unawaited(
+              _updateSavedTrail(
+                state.savedTrailPoints,
+                visible: state.isSavedTrailVisible,
+              ),
+            );
           },
         ),
       ],
@@ -110,19 +156,19 @@ class _MapCanvasState extends State<MapCanvas> {
 
   Future<void> _onStyleLoaded(MapBloc bloc) async {
     final map = _mapboxMap;
-    if (map == null || _trailSource != null) return;
+    if (map == null || _liveTrailSource != null) return;
 
-    final source = GeoJsonSource(
-      id: _trailSourceId,
+    final liveTrailSource = GeoJsonSource(
+      id: _liveTrailSourceId,
       data: _emptyFeatureCollection,
       dynamicData: true,
     );
 
-    await map.addSource(source);
+    await map.addSource(liveTrailSource);
     await map.addLayer(
       LineLayer(
-        id: _trailLayerId,
-        sourceId: _trailSourceId,
+        id: _liveTrailLayerId,
+        sourceId: _liveTrailSourceId,
         lineJoin: LineJoin.ROUND,
         lineCap: LineCap.ROUND,
         lineColor: const Color(0xFF28664A).toARGB32(),
@@ -130,17 +176,98 @@ class _MapCanvasState extends State<MapCanvas> {
       ),
     );
 
-    _trailSource = source;
+    final savedTrailSource = GeoJsonSource(
+      id: _savedTrailSourceId,
+      data: _emptyFeatureCollection,
+      dynamicData: true,
+    );
+
+    await map.addSource(savedTrailSource);
+    await map.addLayer(
+      LineLayer(
+        id: _savedTrailLayerId,
+        sourceId: _savedTrailSourceId,
+        lineJoin: LineJoin.ROUND,
+        lineCap: LineCap.ROUND,
+        lineColor: _savedTrailColor.toARGB32(),
+        lineWidth: 4,
+      ),
+    );
+    _liveTrailSource = liveTrailSource;
+    _savedTrailSource = savedTrailSource;
     _startPuckSampling(bloc);
 
-    await _updateTrail(bloc.state.trailPoints);
+    await _updateLiveTrail(
+      bloc.state.trailPoints,
+      visible: bloc.state.isLiveTrailVisible,
+    );
+    await _displaySavedTrail(
+      bloc.state.savedTrailPoints,
+      visible: bloc.state.isSavedTrailVisible,
+    );
   }
 
-  Future<void> _updateTrail(List<GeoPoint> points) async {
-    final source = _trailSource;
+  Future<void> _updateLiveTrail(
+    List<GeoPoint> points, {
+    required bool visible,
+  }) async {
+    final source = _liveTrailSource;
     if (source == null) return;
 
-    await source.updateGeoJSON(_trailToGeoJson(points));
+    await source.updateGeoJSON(
+      visible ? _trailToGeoJson(points) : _emptyFeatureCollection,
+    );
+  }
+
+  Future<void> _updateSavedTrail(
+    List<GeoPoint> points, {
+    required bool visible,
+  }) async {
+    final source = _savedTrailSource;
+    if (source == null) return;
+
+    await source.updateGeoJSON(
+      visible ? _trailToGeoJson(points) : _emptyFeatureCollection,
+    );
+  }
+
+  Future<void> _displaySavedTrail(
+    List<GeoPoint> points, {
+    required bool visible,
+  }) async {
+    if (_savedTrailSource == null) return;
+
+    await _updateSavedTrail(points, visible: visible);
+
+    final map = _mapboxMap;
+    if (!visible || map == null || points.isEmpty) return;
+
+    final coordinates = points
+        .map(
+          (point) =>
+              Point(coordinates: Position(point.longitude, point.latitude)),
+        )
+        .toList(growable: false);
+    final camera = await map.cameraForCoordinatesPadding(
+      coordinates,
+      CameraOptions(bearing: 0, pitch: 0),
+      MbxEdgeInsets(top: 80, left: 40, bottom: 80, right: 40),
+      17,
+      null,
+    );
+
+    final center = camera.center;
+    if (center == null) return;
+
+    _viewportController.moveTo(
+      CameraViewportState(
+        center: center,
+        zoom: camera.zoom,
+        bearing: camera.bearing,
+        pitch: camera.pitch,
+      ),
+      transition: const DefaultViewportTransition(),
+    );
   }
 
   String _trailToGeoJson(List<GeoPoint> points) {
@@ -193,7 +320,7 @@ class _MapCanvasState extends State<MapCanvas> {
           latitude: coordinates[0]!,
           longitude: coordinates[1]!,
           sampledAt: DateTime.now().toUtc(),
-          accuracyMeters: bloc.state.accuracyMeters,
+          accuracyMeters: bloc.state.effectiveAccuracyMeters,
         ),
       );
     } finally {

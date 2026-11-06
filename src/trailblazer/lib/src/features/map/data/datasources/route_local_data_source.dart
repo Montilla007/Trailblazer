@@ -89,4 +89,41 @@ class RouteLocalDataSource {
         )
         .toList(growable: false);
   }
+
+  Future<List<domain.RoutePoint>> getAllPoints() async {
+    final query =
+        _database.select(_database.routePoints).join([
+          innerJoin(
+            _database.routeDays,
+            _database.routeDays.id.equalsExp(_database.routePoints.routeDayId),
+          ),
+        ])..orderBy([
+          OrderingTerm.asc(_database.routePoints.recordedAtUtc),
+          OrderingTerm.asc(_database.routeDays.localDay),
+          OrderingTerm.asc(_database.routePoints.sequence),
+        ]);
+
+    final rows = await query.get();
+
+    return rows
+        .map((row) {
+          final point = row.readTable(_database.routePoints);
+          return domain.RoutePoint(
+            id: point.id,
+            routeDayId: point.routeDayId,
+            sequence: point.sequence,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            recordedAtUtc: point.recordedAtUtc,
+            accuracyMeters: point.accuracyMeters,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<void> deleteAllRoutes() {
+    return _database.transaction(() async {
+      await _database.delete(_database.routeDays).go();
+    });
+  }
 }
