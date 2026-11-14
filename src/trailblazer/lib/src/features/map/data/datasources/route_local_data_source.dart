@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:trailblazer/src/features/map/data/datasources/route_database.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/map/domain/entities/route_day.dart'
+    as domain_day;
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart'
     as domain;
 
@@ -8,6 +10,22 @@ class RouteLocalDataSource {
   RouteLocalDataSource(this._database);
 
   final RouteDatabase _database;
+
+  Future<List<domain_day.RouteDay>> getSavedRouteDays() async {
+    final rows = await (_database.select(
+      _database.routeDays,
+    )..orderBy([(day) => OrderingTerm.desc(day.localDay)])).get();
+
+    return rows
+        .map(
+          (row) => domain_day.RouteDay(
+            id: row.id,
+            localDay: row.localDay,
+            timezoneOffsetMinutes: row.timezoneOffsetMinutes,
+          ),
+        )
+        .toList(growable: false);
+  }
 
   Future<void> savePoint({
     required String localDay,

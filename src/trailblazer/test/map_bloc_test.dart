@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/map/domain/entities/route_day.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
@@ -251,6 +252,9 @@ class _FakeLocationRepository implements LocationRepository {
 class _FakeRouteHistoryRepository implements RouteHistoryRepository {
   final List<GeoPoint> savedPoints = [];
   final List<RoutePoint> routePoints = [];
+
+  @override
+  Future<List<RouteDay>> getSavedRouteDays() async => const [];
 
   @override
   Future<List<RoutePoint>> getPointsForDay({required String localDay}) async {

@@ -1,4 +1,5 @@
 import 'package:trailblazer/src/features/map/data/datasources/route_local_data_source.dart';
+import 'package:trailblazer/src/features/map/domain/entities/route_day.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
@@ -7,6 +8,11 @@ class RouteHistoryRepositoryImpl implements RouteHistoryRepository {
   RouteHistoryRepositoryImpl(this._localDataSource);
 
   final RouteLocalDataSource _localDataSource;
+
+  @override
+  Future<List<RouteDay>> getSavedRouteDays() {
+    return _localDataSource.getSavedRouteDays();
+  }
 
   @override
   Future<void> savePoint({

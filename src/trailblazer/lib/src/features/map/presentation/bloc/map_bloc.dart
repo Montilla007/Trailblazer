@@ -67,7 +67,6 @@ class MapBloc extends Bloc<MapEvent, MapState> {
         ),
       );
     });
-
     on<MapTrackingStopped>((event, emit) async {
       await _locationSubscription?.cancel();
       _locationSubscription = null;
