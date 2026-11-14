@@ -47,3 +47,7 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("com.mapbox.maps:android-ndk27:11.33.0")
+}

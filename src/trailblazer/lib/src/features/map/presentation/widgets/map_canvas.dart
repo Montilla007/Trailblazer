@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -8,6 +9,9 @@ import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_bloc.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_event.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_state.dart';
+import 'package:trailblazer/src/features/map/presentation/services/mapbox_puck_location_source.dart';
+import 'package:trailblazer/src/features/map/presentation/services/mapbox_puck_query_comparator.dart';
+import 'package:trailblazer/src/features/map/presentation/services/map_trail_geojson.dart';
 
 class MapCanvas extends StatefulWidget {
   const MapCanvas({super.key});
@@ -22,8 +26,6 @@ class _MapCanvasState extends State<MapCanvas> {
   static const _savedTrailSourceId = 'saved-trail-source';
   static const _savedTrailLayerId = 'saved-trail-layer';
   static const _savedTrailColor = Color(0xFF1976D2);
-  static const _emptyFeatureCollection =
-      '{"type":"FeatureCollection","features":[]}';
 
   final ViewportController _viewportController = ViewportController();
 
@@ -31,8 +33,8 @@ class _MapCanvasState extends State<MapCanvas> {
   GeoJsonSource? _liveTrailSource;
   GeoJsonSource? _savedTrailSource;
   StreamSubscription<dynamic>? _panGestureSubscription;
-  Timer? _puckSamplingTimer;
-  bool _puckSampleInFlight = false;
+  StreamSubscription<GeoPoint>? _puckLocationSubscription;
+  MapboxPuckQueryComparator? _puckQueryComparator;
 
   @override
   Widget build(BuildContext context) {
@@ -70,11 +72,13 @@ class _MapCanvasState extends State<MapCanvas> {
         BlocListener<MapBloc, MapState>(
           listenWhen: (previous, current) =>
               previous.trailPoints != current.trailPoints ||
+              previous.savedTrailPoints != current.savedTrailPoints ||
               previous.isLiveTrailVisible != current.isLiveTrailVisible,
           listener: (context, state) {
             unawaited(
               _updateLiveTrail(
                 state.trailPoints,
+                savedPoints: state.savedTrailPoints,
                 visible: state.isLiveTrailVisible,
               ),
             );
@@ -131,6 +135,29 @@ class _MapCanvasState extends State<MapCanvas> {
 
   Future<void> _onMapCreated(MapBloc bloc, MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
+    _puckLocationSubscription = const MapboxPuckLocationSource().updates.listen(
+      (point) {
+        if (!mounted) return;
+
+        _puckQueryComparator?.updateCallbackPosition(point);
+        bloc.add(
+          MapPuckPositionReceived(
+            latitude: point.latitude,
+            longitude: point.longitude,
+            timestamp: point.timestamp ?? DateTime.now().toUtc(),
+          ),
+        );
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        developer.log(
+          'Mapbox puck location callback failed.',
+          name: 'trailblazer.map',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        bloc.add(MapPuckLocationFailed(error.toString()));
+      },
+    );
 
     _panGestureSubscription = mapboxMap.gestures.pan.gestureEvents.listen((
       event,
@@ -160,7 +187,7 @@ class _MapCanvasState extends State<MapCanvas> {
 
     final liveTrailSource = GeoJsonSource(
       id: _liveTrailSourceId,
-      data: _emptyFeatureCollection,
+      data: MapTrailGeoJson.emptyFeatureCollection,
       dynamicData: true,
     );
 
@@ -176,46 +203,59 @@ class _MapCanvasState extends State<MapCanvas> {
       ),
     );
 
-    final savedTrailSource = GeoJsonSource(
-      id: _savedTrailSourceId,
-      data: _emptyFeatureCollection,
-      dynamicData: true,
-    );
-
-    await map.addSource(savedTrailSource);
-    await map.addLayer(
-      LineLayer(
-        id: _savedTrailLayerId,
-        sourceId: _savedTrailSourceId,
-        lineJoin: LineJoin.ROUND,
-        lineCap: LineCap.ROUND,
-        lineColor: _savedTrailColor.toARGB32(),
-        lineWidth: 4,
-      ),
-    );
     _liveTrailSource = liveTrailSource;
-    _savedTrailSource = savedTrailSource;
-    _startPuckSampling(bloc);
+    if (kDebugMode) {
+      final savedTrailSource = GeoJsonSource(
+        id: _savedTrailSourceId,
+        data: MapTrailGeoJson.emptyFeatureCollection,
+        dynamicData: true,
+      );
+
+      await map.addSource(savedTrailSource);
+      await map.addLayer(
+        LineLayer(
+          id: _savedTrailLayerId,
+          sourceId: _savedTrailSourceId,
+          lineJoin: LineJoin.ROUND,
+          lineCap: LineCap.ROUND,
+          lineColor: _savedTrailColor.toARGB32(),
+          lineWidth: 4,
+        ),
+      );
+      _savedTrailSource = savedTrailSource;
+    }
+
+    if (kDebugMode) {
+      _puckQueryComparator = MapboxPuckQueryComparator(map)..start();
+    }
 
     await _updateLiveTrail(
       bloc.state.trailPoints,
+      savedPoints: bloc.state.savedTrailPoints,
       visible: bloc.state.isLiveTrailVisible,
     );
-    await _displaySavedTrail(
+    await _updateSavedTrail(
       bloc.state.savedTrailPoints,
       visible: bloc.state.isSavedTrailVisible,
     );
   }
 
   Future<void> _updateLiveTrail(
-    List<GeoPoint> points, {
+    List<GeoPoint> temporaryPoints, {
+    required List<GeoPoint> savedPoints,
     required bool visible,
   }) async {
     final source = _liveTrailSource;
     if (source == null) return;
 
     await source.updateGeoJSON(
-      visible ? _trailToGeoJson(points) : _emptyFeatureCollection,
+      visible
+          ? MapTrailGeoJson.live(
+              temporaryPoints: temporaryPoints,
+              savedPoints: savedPoints,
+              includeSavedTrail: !kDebugMode,
+            )
+          : MapTrailGeoJson.emptyFeatureCollection,
     );
   }
 
@@ -227,7 +267,9 @@ class _MapCanvasState extends State<MapCanvas> {
     if (source == null) return;
 
     await source.updateGeoJSON(
-      visible ? _trailToGeoJson(points) : _emptyFeatureCollection,
+      visible
+          ? MapTrailGeoJson.singleLine(points)
+          : MapTrailGeoJson.emptyFeatureCollection,
     );
   }
 
@@ -270,68 +312,11 @@ class _MapCanvasState extends State<MapCanvas> {
     );
   }
 
-  String _trailToGeoJson(List<GeoPoint> points) {
-    if (points.length < 2) return _emptyFeatureCollection;
-
-    return jsonEncode({
-      'type': 'FeatureCollection',
-      'features': [
-        {
-          'type': 'Feature',
-          'geometry': {
-            'type': 'LineString',
-            'coordinates': [
-              for (final point in points) [point.longitude, point.latitude],
-            ],
-          },
-          'properties': <String, Object?>{},
-        },
-      ],
-    });
-  }
-
-  void _startPuckSampling(MapBloc bloc) {
-    _puckSamplingTimer?.cancel();
-
-    _puckSamplingTimer = Timer.periodic(
-      const Duration(milliseconds: 50),
-      (_) => unawaited(_samplePuckPosition(bloc)),
-    );
-  }
-
-  Future<void> _samplePuckPosition(MapBloc bloc) async {
-    if (_puckSampleInFlight) return;
-
-    final map = _mapboxMap;
-    if (map == null) return;
-
-    _puckSampleInFlight = true;
-
-    try {
-      final layer = await map.getLayer('mapbox-location-indicator-layer');
-
-      if (layer is! LocationIndicatorLayer) return;
-
-      final coordinates = layer.location;
-      if (coordinates == null || coordinates.length < 2 || !mounted) return;
-
-      bloc.add(
-        MapPuckPositionSampled(
-          latitude: coordinates[0]!,
-          longitude: coordinates[1]!,
-          sampledAt: DateTime.now().toUtc(),
-          accuracyMeters: bloc.state.effectiveAccuracyMeters,
-        ),
-      );
-    } finally {
-      _puckSampleInFlight = false;
-    }
-  }
-
   @override
   void dispose() {
-    _puckSamplingTimer?.cancel();
     unawaited(_panGestureSubscription?.cancel());
+    unawaited(_puckLocationSubscription?.cancel());
+    _puckQueryComparator?.stop();
     _viewportController.dispose();
     super.dispose();
   }

@@ -33,9 +33,7 @@ class MapPage extends StatelessWidget {
           DeleteAllSavedRoutes(repository),
         )..add(const MapTrackingRequested());
 
-        if (kDebugMode) {
-          bloc.add(const MapAllSavedTrailLoadRequested());
-        }
+        bloc.add(const MapAllSavedTrailLoadRequested());
 
         return bloc;
       },

@@ -3,6 +3,7 @@ import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
+import 'package:trailblazer/src/features/map/domain/services/location_movement_filter.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_routes.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_all_saved_route_points.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_route_for_day.dart';
@@ -34,7 +35,7 @@ void main() {
   });
 
   test(
-    'puck sample updates the live trail and saves the route point',
+    'Geolocator update saves the route point without driving the puck trail',
     () async {
       final repository = _FakeRouteHistoryRepository();
       final bloc = _createMapBloc(repository);
@@ -42,25 +43,102 @@ void main() {
       final sampledAt = DateTime.utc(2026, 11, 4);
 
       final stateFuture = bloc.stream.firstWhere(
-        (state) => state.trailPoints.isNotEmpty,
+        (state) => state.savedTrailPoints.isNotEmpty,
       );
       bloc.add(
-        MapPuckPositionSampled(
+        MapLocationReceived(
           latitude: 1,
           longitude: 2,
-          sampledAt: sampledAt,
+          timestamp: sampledAt,
           accuracyMeters: 3,
         ),
       );
 
       final state = await stateFuture;
-      expect(state.trailPoints, hasLength(1));
-      expect(state.trailPoints.single.latitude, 1);
-      expect(state.trailPoints.single.longitude, 2);
+      expect(state.trailPoints, isEmpty);
       expect(repository.savedPoints, hasLength(1));
       expect(repository.savedPoints.single.timestamp, sampledAt);
     },
   );
+
+  test('temporary puck trail anchors to its nearest saved coordinate', () async {
+    final repository = _FakeRouteHistoryRepository()
+      ..routePoints.addAll([
+        RoutePoint(
+          id: 1,
+          routeDayId: 1,
+          sequence: 1,
+          latitude: 47,
+          longitude: -122,
+          recordedAtUtc: DateTime.utc(2026, 11, 5),
+        ),
+        RoutePoint(
+          id: 2,
+          routeDayId: 1,
+          sequence: 2,
+          latitude: 47.001,
+          longitude: -122,
+          recordedAtUtc: DateTime.utc(2026, 11, 5, 0, 1),
+        ),
+      ]);
+    final bloc = _createMapBloc(repository);
+    addTearDown(() async => bloc.close());
+
+    final trailFuture = bloc.stream.firstWhere(
+      (state) => state.trailPoints.length == 2,
+    );
+    bloc.add(
+      MapPuckPositionReceived(
+        latitude: 47.00101,
+        longitude: -122,
+        timestamp: DateTime.utc(2026, 11, 6),
+      ),
+    );
+
+    final state = await trailFuture;
+    expect(state.trailPoints.first.latitude, 47.001);
+    expect(state.trailPoints.first.longitude, -122);
+    expect(state.trailPoints.last.latitude, 47.00101);
+    expect(repository.savedPoints, isEmpty);
+
+    final extensionFuture = bloc.stream.firstWhere(
+      (nextState) => nextState.trailPoints.length == 3,
+    );
+    bloc.add(
+      MapPuckPositionReceived(
+        latitude: 47.00103,
+        longitude: -122,
+        timestamp: DateTime.utc(2026, 11, 6, 0, 0, 1),
+      ),
+    );
+    final extendedState = await extensionFuture;
+
+    expect(extendedState.trailPoints.first.latitude, 47.001);
+    expect(extendedState.trailPoints.length, 3);
+    expect(repository.savedPoints, isEmpty);
+  });
+
+  test('puck trail filter rejects movement under its minimum distance', () {
+    final filter = LocationMovementFilter(minimumMovementMeters: 1);
+    final timestamp = DateTime.utc(2026, 11, 4);
+
+    expect(
+      filter.shouldAccept(
+        GeoPoint(latitude: 1, longitude: 2, timestamp: timestamp),
+      ),
+      isTrue,
+    );
+    expect(
+      filter.shouldAccept(
+        GeoPoint(
+          latitude: 1.000001,
+          longitude: 2,
+          timestamp: timestamp.add(const Duration(seconds: 1)),
+        ),
+      ),
+      isFalse,
+    );
+  });
 
   test('showing the saved trail loads today from the repository', () async {
     final repository = _FakeRouteHistoryRepository()
@@ -105,13 +183,13 @@ void main() {
     await modeFuture;
 
     final stateFuture = bloc.stream.firstWhere(
-      (state) => state.trailPoints.isNotEmpty,
+      (state) => state.savedTrailPoints.isNotEmpty,
     );
     bloc.add(
-      MapPuckPositionSampled(
+      MapLocationReceived(
         latitude: 47,
         longitude: -122,
-        sampledAt: DateTime.utc(2026, 11, 6),
+        timestamp: DateTime.utc(2026, 11, 6),
         accuracyMeters: 3,
       ),
     );
@@ -132,13 +210,13 @@ void main() {
     final modeState = await modeFuture;
 
     final trailFuture = bloc.stream.firstWhere(
-      (state) => state.trailPoints.isNotEmpty,
+      (state) => state.savedTrailPoints.isNotEmpty,
     );
     bloc.add(
-      MapPuckPositionSampled(
+      MapLocationReceived(
         latitude: 47,
         longitude: -122,
-        sampledAt: DateTime.utc(2026, 11, 6),
+        timestamp: DateTime.utc(2026, 11, 6),
         accuracyMeters: 3,
       ),
     );
@@ -149,10 +227,7 @@ void main() {
       repository.savedPoints.single.accuracyMeters,
       modeState.effectiveAccuracyMeters,
     );
-    expect(
-      trailState.trailPoints.single.accuracyMeters,
-      modeState.effectiveAccuracyMeters,
-    );
+    expect(trailState.trailPoints, isEmpty);
   });
 }
 
@@ -184,7 +259,21 @@ class _FakeRouteHistoryRepository implements RouteHistoryRepository {
 
   @override
   Future<List<RoutePoint>> getAllPoints() async {
-    return routePoints;
+    if (savedPoints.isEmpty) return routePoints;
+
+    return [
+      ...routePoints,
+      for (var index = 0; index < savedPoints.length; index++)
+        RoutePoint(
+          id: index + 1,
+          routeDayId: 1,
+          sequence: index + 1,
+          latitude: savedPoints[index].latitude,
+          longitude: savedPoints[index].longitude,
+          recordedAtUtc: savedPoints[index].timestamp!,
+          accuracyMeters: savedPoints[index].accuracyMeters,
+        ),
+    ];
   }
 
   @override

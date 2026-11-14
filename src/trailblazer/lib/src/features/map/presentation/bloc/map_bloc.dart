@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:trailblazer/src/features/map/domain/services/location_movement_filter.dart';
 import 'package:trailblazer/src/features/map/domain/services/route_point_sampling_filter.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_routes.dart';
@@ -42,6 +43,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
             MapLocationReceived(
               latitude: point.latitude,
               longitude: point.longitude,
+              timestamp: point.timestamp ?? DateTime.now().toUtc(),
               accuracyMeters: point.accuracyMeters,
             ),
           );
@@ -52,15 +54,16 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       );
     });
 
-    on<MapLocationReceived>((event, emit) {
+    on<MapLocationReceived>(_onLocationReceived);
+    on<MapPuckPositionReceived>(
+      _onPuckPositionReceived,
+      transformer: (events, mapper) => events.asyncExpand(mapper),
+    );
+    on<MapPuckLocationFailed>((event, emit) {
       emit(
         state.copyWith(
-          status: MapStatus.tracking,
-          latitude: event.latitude,
-          longitude: event.longitude,
-          accuracyMeters: event.accuracyMeters,
-          clearAccuracyMeters: event.accuracyMeters == null,
-          clearErrorMessage: true,
+          debugMessage: 'Mapbox puck location unavailable: ${event.message}',
+          debugMessageIsError: true,
         ),
       );
     });
@@ -97,7 +100,6 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       emit(state.copyWith(pitch: state.pitch == 0 ? 45 : 0));
     });
     on<MapDebugAccuracyModeSelected>(_onDebugAccuracyModeSelected);
-    on<MapPuckPositionSampled>(_onPuckPositionSampled);
     on<MapLiveTrailVisibilityToggled>((event, emit) {
       emit(state.copyWith(isLiveTrailVisible: !state.isLiveTrailVisible));
     });
@@ -113,10 +115,135 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   final DeleteAllSavedRoutes _deleteAllSavedRoutes;
   StreamSubscription<GeoPoint>? _locationSubscription;
   final List<GeoPoint> _trailPoints = [];
+  final LocationMovementFilter _puckTrailFilter = LocationMovementFilter(
+    minimumMovementMeters: 1,
+  );
+  Future<List<GeoPoint>>? _allSavedTrailPointsLoad;
+  bool _puckTrailStarted = false;
 
   final SaveRoutePoint _saveRoutePoint;
   final RoutePointSamplingFilter _samplingFilter = RoutePointSamplingFilter();
   final Random _random = Random();
+
+  Future<void> _onLocationReceived(
+    MapLocationReceived event,
+    Emitter<MapState> emit,
+  ) async {
+    final accuracyMeters = state.debugAccuracyMode == null
+        ? event.accuracyMeters
+        : state.effectiveAccuracyMeters;
+
+    emit(
+      state.copyWith(
+        status: MapStatus.tracking,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        accuracyMeters: accuracyMeters,
+        clearAccuracyMeters: accuracyMeters == null,
+        clearErrorMessage: true,
+      ),
+    );
+
+    final point = GeoPoint(
+      latitude: event.latitude,
+      longitude: event.longitude,
+      accuracyMeters: accuracyMeters,
+      timestamp: event.timestamp,
+    );
+
+    if (!_samplingFilter.shouldSave(point)) return;
+
+    await _saveRoutePoint(point);
+    if (!kDebugMode) return;
+
+    developer.log(
+      '[Saved Cord] Saved route point to SQLite '
+      '(approx lat: ${point.latitude.toStringAsFixed(2)}, '
+      'lon: ${point.longitude.toStringAsFixed(2)}).',
+      name: 'trailblazer.map',
+    );
+
+    final localDay = _formatLocalDay(point.timestamp!.toLocal());
+    if (!state.isSavedTrailVisible) return;
+
+    try {
+      emit(
+        state.copyWith(
+          savedTrailPoints: state.savedTrailLocalDay == null
+              ? await _getAllSavedTrailPoints()
+              : state.savedTrailLocalDay == localDay
+              ? await _getSavedTrailPoints(localDay)
+              : state.savedTrailPoints,
+        ),
+      );
+    } on Exception catch (error, stackTrace) {
+      developer.log(
+        '[Saved Trail] Could not refresh the SQLite trail.',
+        name: 'trailblazer.map',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      emit(
+        state.copyWith(
+          debugMessage: 'Could not refresh the saved trail: $error',
+          debugMessageIsError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onPuckPositionReceived(
+    MapPuckPositionReceived event,
+    Emitter<MapState> emit,
+  ) async {
+    final point = GeoPoint(
+      latitude: event.latitude,
+      longitude: event.longitude,
+      timestamp: event.timestamp,
+    );
+
+    if (!_puckTrailFilter.shouldAccept(point)) return;
+
+    if (!_puckTrailStarted) {
+      var savedPoints = state.savedTrailPoints;
+      try {
+        savedPoints = await _loadAllSavedTrailPoints();
+        if (state.savedTrailLocalDay == null) {
+          emit(
+            state.copyWith(
+              savedTrailPoints: savedPoints,
+              isSavedTrailVisible: true,
+            ),
+          );
+        }
+      } on Exception catch (error, stackTrace) {
+        developer.log(
+          'Could not load saved points to anchor the temporary puck trail.',
+          name: 'trailblazer.map',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        emit(
+          state.copyWith(
+            debugMessage: 'Could not load saved trail for anchoring: $error',
+            debugMessageIsError: true,
+          ),
+        );
+      }
+
+      final anchor = _nearestPoint(point, savedPoints);
+      if (anchor != null) {
+        _trailPoints.add(anchor);
+      }
+      _puckTrailStarted = true;
+    }
+
+    final lastPoint = _trailPoints.isEmpty ? null : _trailPoints.last;
+    if (lastPoint == null || _distanceMeters(lastPoint, point) >= 0.1) {
+      _trailPoints.add(point);
+      emit(state.copyWith(trailPoints: List.unmodifiable(_trailPoints)));
+    }
+  }
 
   void _onDebugAccuracyModeSelected(
     MapDebugAccuracyModeSelected event,
@@ -146,64 +273,6 @@ class MapBloc extends Bloc<MapEvent, MapState> {
         debugAccuracyMeters: accuracyMeters,
       ),
     );
-  }
-
-  Future<void> _onPuckPositionSampled(
-    MapPuckPositionSampled event,
-    Emitter<MapState> emit,
-  ) async {
-    final sampledPoint = GeoPoint(
-      latitude: event.latitude,
-      longitude: event.longitude,
-      accuracyMeters: state.debugAccuracyMode == null
-          ? event.accuracyMeters
-          : state.effectiveAccuracyMeters,
-      timestamp: event.sampledAt,
-    );
-
-    // The filter decides whether this sample is worth saving.
-    if (_samplingFilter.shouldSave(sampledPoint)) {
-      await _saveRoutePoint(sampledPoint);
-      if (kDebugMode) {
-        developer.log(
-          '[Saved Cord] Saved route point to SQLite '
-          '(approx lat: ${sampledPoint.latitude.toStringAsFixed(2)}, '
-          'lon: ${sampledPoint.longitude.toStringAsFixed(2)}).',
-          name: 'trailblazer.map',
-        );
-
-        final localDay = _formatLocalDay(sampledPoint.timestamp!.toLocal());
-        if (state.isSavedTrailVisible) {
-          try {
-            emit(
-              state.copyWith(
-                savedTrailPoints: state.savedTrailLocalDay == null
-                    ? await _getAllSavedTrailPoints()
-                    : state.savedTrailLocalDay == localDay
-                    ? await _getSavedTrailPoints(localDay)
-                    : state.savedTrailPoints,
-              ),
-            );
-          } on Exception catch (error, stackTrace) {
-            developer.log(
-              '[Saved Trail] Could not refresh the SQLite trail.',
-              name: 'trailblazer.map',
-              error: error,
-              stackTrace: stackTrace,
-            );
-            emit(
-              state.copyWith(
-                debugMessage: 'Could not refresh the saved trail: $error',
-                debugMessageIsError: true,
-              ),
-            );
-          }
-        }
-      }
-    }
-
-    _trailPoints.add(sampledPoint);
-    emit(state.copyWith(trailPoints: List.unmodifiable(_trailPoints)));
   }
 
   Future<void> _onSavedTrailLoadRequested(
@@ -245,15 +314,13 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     emit(state.copyWith(clearDebugMessage: true));
 
     try {
-      final savedTrailPoints = await _getAllSavedTrailPoints();
+      _allSavedTrailPointsLoad = null;
+      final savedTrailPoints = await _loadAllSavedTrailPoints();
       emit(
         state.copyWith(
           savedTrailPoints: savedTrailPoints,
           isSavedTrailVisible: true,
           clearSavedTrailLocalDay: true,
-          viewportMode: savedTrailPoints.isEmpty
-              ? state.viewportMode
-              : MapViewportMode.idle,
           debugMessage: savedTrailPoints.isEmpty
               ? 'No saved route points found.'
               : 'Loaded ${savedTrailPoints.length} saved points across all dates.',
@@ -346,6 +413,50 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   Future<List<GeoPoint>> _getAllSavedTrailPoints() async {
     final points = await _getAllSavedRoutePoints();
     return _toGeoPoints(points);
+  }
+
+  Future<List<GeoPoint>> _loadAllSavedTrailPoints() async {
+    final load = _allSavedTrailPointsLoad ??= _getAllSavedTrailPoints();
+    try {
+      return await load;
+    } on Exception {
+      _allSavedTrailPointsLoad = null;
+      rethrow;
+    }
+  }
+
+  GeoPoint? _nearestPoint(GeoPoint position, List<GeoPoint> savedPoints) {
+    GeoPoint? nearest;
+    var nearestDistance = double.infinity;
+
+    for (final savedPoint in savedPoints) {
+      final distance = _distanceMeters(position, savedPoint);
+      if (distance < nearestDistance) {
+        nearest = savedPoint;
+        nearestDistance = distance;
+      }
+    }
+
+    return nearest;
+  }
+
+  double _distanceMeters(GeoPoint a, GeoPoint b) {
+    const earthRadiusMeters = 6371000.0;
+    final latitudeA = a.latitude * pi / 180;
+    final latitudeB = b.latitude * pi / 180;
+    final deltaLatitude = (b.latitude - a.latitude) * pi / 180;
+    final deltaLongitude = (b.longitude - a.longitude) * pi / 180;
+    final sinHalfLatitude = sin(deltaLatitude / 2);
+    final sinHalfLongitude = sin(deltaLongitude / 2);
+    final haversine =
+        sinHalfLatitude * sinHalfLatitude +
+        cos(latitudeA) * cos(latitudeB) *
+            sinHalfLongitude *
+            sinHalfLongitude;
+
+    return 2 *
+        earthRadiusMeters *
+        asin(sqrt(haversine.clamp(0.0, 1.0)));
   }
 
   List<GeoPoint> _toGeoPoints(Iterable<RoutePoint> points) {

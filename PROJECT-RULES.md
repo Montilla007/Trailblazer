@@ -53,7 +53,8 @@ For projects with an API, record project-specific conventions such as:
 
 - Use both movement and elapsed time to request/record location updates. The initial target is about 10 meters or 30 seconds, whichever comes first; treat these as tunable starting values.
 - Persist confirmed locations on-device and retain timestamps and available accuracy information.
-- For the current route-storage work, sample the Mapbox location puck for the displayed live trail, then save only samples accepted by RoutePointSamplingFilter. The current filter defaults are adjustable starting values, not fixed product requirements.
+- Use Mapbox's native location-indicator callback for the temporary displayed puck trail, anchoring its first point to the nearest saved trail coordinate. Keep that temporary segment in memory only. Use Geolocator updates and RoutePointSamplingFilter for persisted route history. Filter defaults are adjustable starting values, not fixed product requirements.
+- Outside debug builds, render saved history and the temporary puck segment together in the default Live Trail as separate line features sharing the fixed anchor. Keep the standalone Saved Trail overlay debug-only.
 - Group persisted route points by the device's local calendar date. Store each point's timestamp in UTC and preserve sequence order within its route day.
 - When GPS updates stop, keep the last confirmed point as historical data; do not silently present it as a fresh fix.
 - For a photo without GPS metadata, use the most recent suitable confirmed app location recorded before capture and mark the association approximate. The age limit for a "suitable" location remains an open decision; do not invent one.
