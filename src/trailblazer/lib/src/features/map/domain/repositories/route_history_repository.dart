@@ -1,4 +1,5 @@
 import '../entities/geo_point.dart';
+import '../entities/route_day.dart';
 import '../entities/route_point.dart';
 
 abstract interface class RouteHistoryRepository {
@@ -7,6 +8,8 @@ abstract interface class RouteHistoryRepository {
     required int timezoneOffsetMinutes,
     required GeoPoint point,
   });
+
+  Future<List<RouteDay>> getSavedRouteDays();
 
   Future<List<RoutePoint>> getPointsForDay({required String localDay});
 

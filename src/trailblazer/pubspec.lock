@@ -209,6 +209,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.15"
+  dependency_graph:
+    dependency: "direct dev"
+    description:
+      name: dependency_graph
+      sha256: "8d33bfa3dad7f2dcff7b5067152a99f348bbaea40c79179cc1ef7468dc17f659"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.0"
   drift:
     dependency: "direct main"
     description:

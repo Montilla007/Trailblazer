@@ -21,6 +21,7 @@ class MapState {
     this.trailPoints = const [],
     this.isLiveTrailVisible = true,
     this.savedTrailPoints = const [],
+    this.liveSavedTrailPointsByDay = const {},
     this.isSavedTrailVisible = true,
     this.savedTrailLocalDay,
     this.debugMessage,
@@ -40,6 +41,7 @@ class MapState {
   final List<GeoPoint> trailPoints;
   final bool isLiveTrailVisible;
   final List<GeoPoint> savedTrailPoints;
+  final Map<String, List<GeoPoint>> liveSavedTrailPointsByDay;
   final bool isSavedTrailVisible;
   final String? savedTrailLocalDay;
   final String? debugMessage;
@@ -69,6 +71,7 @@ class MapState {
     List<GeoPoint>? trailPoints,
     bool? isLiveTrailVisible,
     List<GeoPoint>? savedTrailPoints,
+    Map<String, List<GeoPoint>>? liveSavedTrailPointsByDay,
     bool? isSavedTrailVisible,
     String? savedTrailLocalDay,
     String? debugMessage,
@@ -96,6 +99,8 @@ class MapState {
       trailPoints: trailPoints ?? this.trailPoints,
       isLiveTrailVisible: isLiveTrailVisible ?? this.isLiveTrailVisible,
       savedTrailPoints: savedTrailPoints ?? this.savedTrailPoints,
+      liveSavedTrailPointsByDay:
+          liveSavedTrailPointsByDay ?? this.liveSavedTrailPointsByDay,
       isSavedTrailVisible: isSavedTrailVisible ?? this.isSavedTrailVisible,
       savedTrailLocalDay: clearSavedTrailLocalDay
           ? null

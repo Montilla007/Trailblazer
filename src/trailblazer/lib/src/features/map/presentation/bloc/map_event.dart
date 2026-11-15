@@ -12,12 +12,32 @@ final class MapLocationReceived extends MapEvent {
   const MapLocationReceived({
     required this.latitude,
     required this.longitude,
+    required this.timestamp,
     this.accuracyMeters,
   });
 
   final double latitude;
   final double longitude;
+  final DateTime timestamp;
   final double? accuracyMeters;
+}
+
+final class MapPuckPositionReceived extends MapEvent {
+  const MapPuckPositionReceived({
+    required this.latitude,
+    required this.longitude,
+    required this.timestamp,
+  });
+
+  final double latitude;
+  final double longitude;
+  final DateTime timestamp;
+}
+
+final class MapPuckLocationFailed extends MapEvent {
+  const MapPuckLocationFailed(this.message);
+
+  final String message;
 }
 
 final class MapPermissionDenied extends MapEvent {
@@ -60,20 +80,6 @@ final class MapDebugAccuracyModeSelected extends MapEvent {
   final DebugAccuracyMode mode;
 }
 
-final class MapPuckPositionSampled extends MapEvent {
-  const MapPuckPositionSampled({
-    required this.latitude,
-    required this.longitude,
-    required this.sampledAt,
-    this.accuracyMeters,
-  });
-
-  final double latitude;
-  final double longitude;
-  final DateTime sampledAt;
-  final double? accuracyMeters;
-}
-
 final class MapLiveTrailVisibilityToggled extends MapEvent {
   const MapLiveTrailVisibilityToggled();
 }
@@ -90,6 +96,10 @@ final class MapSavedTrailLoadRequested extends MapEvent {
 
 final class MapAllSavedTrailLoadRequested extends MapEvent {
   const MapAllSavedTrailLoadRequested();
+}
+
+final class MapRecentSavedTrailLoadRequested extends MapEvent {
+  const MapRecentSavedTrailLoadRequested();
 }
 
 final class MapAllSavedRoutesDeleteRequested extends MapEvent {
