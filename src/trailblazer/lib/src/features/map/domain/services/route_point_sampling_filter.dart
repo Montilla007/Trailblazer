@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import '../entities/geo_point.dart';
 
+enum RoutePointSaveReason { firstPoint, minimumDistance, maximumInterval, turn }
+
 class RoutePointSamplingFilter {
   RoutePointSamplingFilter({
     this.minimumDistanceMeters = 5,
@@ -22,6 +24,10 @@ class RoutePointSamplingFilter {
   double? _previousBearingDegrees;
 
   bool shouldSave(GeoPoint point) {
+    return saveReasonsFor(point) != null;
+  }
+
+  Set<RoutePointSaveReason>? saveReasonsFor(GeoPoint point) {
     final timestamp = point.timestamp;
 
     if (timestamp == null ||
@@ -31,7 +37,7 @@ class RoutePointSamplingFilter {
         point.latitude > 90 ||
         point.longitude < -180 ||
         point.longitude > 180) {
-      return false;
+      return null;
     }
 
     final lastSaved = _lastSavedPoint;
@@ -39,12 +45,12 @@ class RoutePointSamplingFilter {
     // Keep the route's first point.
     if (lastSaved == null) {
       _markSaved(point);
-      return true;
+      return {RoutePointSaveReason.firstPoint};
     }
 
     final lastSavedTime = lastSaved.timestamp;
     if (lastSavedTime == null || !timestamp.isAfter(lastSavedTime)) {
-      return false;
+      return null;
     }
 
     final distanceFromLastSaved = _distanceMeters(lastSaved, point);
@@ -53,21 +59,25 @@ class RoutePointSamplingFilter {
     // Require some movement, even when the timer or turn condition fires,
     // to avoid saving stationary GPS drift.
     if (distanceFromLastSaved < minimumMovementMeters) {
-      return false;
+      return null;
     }
 
     final timePassed = timestamp.difference(lastSavedTime);
 
-    final shouldSave =
-        distanceFromLastSaved >= minimumDistanceMeters ||
-        timePassed >= maximumInterval ||
-        turned;
-
-    if (shouldSave) {
-      _markSaved(point);
+    final reasons = <RoutePointSaveReason>{};
+    if (distanceFromLastSaved >= minimumDistanceMeters) {
+      reasons.add(RoutePointSaveReason.minimumDistance);
     }
+    if (timePassed >= maximumInterval) {
+      reasons.add(RoutePointSaveReason.maximumInterval);
+    }
+    if (turned) {
+      reasons.add(RoutePointSaveReason.turn);
+    }
+    if (reasons.isEmpty) return null;
 
-    return shouldSave;
+    _markSaved(point);
+    return Set.unmodifiable(reasons);
   }
 
   void reset() {

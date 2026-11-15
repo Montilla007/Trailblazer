@@ -37,11 +37,12 @@ that alternative.
 - Mapbox map with location puck, follow/recenter, zoom, and pitch controls.
 - Device location updates and GPS accuracy display.
 - Live Trail rendering from Mapbox's puck callback, anchored to the nearest
-  saved route coordinate. In non-debug builds, the saved history and temporary
-  puck segment render together as separate line features sharing the anchor;
-  the temporary segment remains in memory only. Geolocator positions continue
-  to drive sampled route-point persistence using Drift/SQLite. A debug-only
-  layer query compares puck callback and queried positions.
+  saved route coordinate from today or yesterday (device-local dates). In
+  non-debug builds, each saved day and the temporary puck segment render as
+  separate line features; the temporary segment remains in memory only.
+  Geolocator positions continue to drive sampled route-point persistence using
+  Drift/SQLite. A debug-only layer query compares puck callback and queried
+  positions.
 - Debug-build-only Map panel and Saved Trail overlay for inspecting live and
   saved routes, loading an individual date, and deleting all saved route
   history after confirmation.

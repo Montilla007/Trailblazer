@@ -5,6 +5,7 @@ import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
 import 'package:trailblazer/src/features/map/domain/services/location_movement_filter.dart';
+import 'package:trailblazer/src/features/map/domain/services/route_point_sampling_filter.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_routes.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_all_saved_route_points.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_route_for_day.dart';
@@ -62,62 +63,82 @@ void main() {
     },
   );
 
-  test('temporary puck trail anchors to its nearest saved coordinate', () async {
-    final repository = _FakeRouteHistoryRepository()
-      ..routePoints.addAll([
-        RoutePoint(
-          id: 1,
-          routeDayId: 1,
-          sequence: 1,
-          latitude: 47,
+  test(
+    'temporary puck trail anchors to its nearest saved coordinate',
+    () async {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day, 12);
+      final yesterday = DateTime(now.year, now.month, now.day - 1, 12);
+      final twoDaysAgo = DateTime(now.year, now.month, now.day - 2, 12);
+      final repository = _FakeRouteHistoryRepository()
+        ..routePoints.addAll([
+          RoutePoint(
+            id: 1,
+            routeDayId: 1,
+            sequence: 1,
+            latitude: 47,
+            longitude: -122,
+            recordedAtUtc: today.toUtc(),
+          ),
+          RoutePoint(
+            id: 2,
+            routeDayId: 2,
+            sequence: 1,
+            latitude: 47.001,
+            longitude: -122,
+            recordedAtUtc: yesterday.toUtc(),
+          ),
+          RoutePoint(
+            id: 3,
+            routeDayId: 3,
+            sequence: 1,
+            latitude: 47.00104,
+            longitude: -122,
+            recordedAtUtc: twoDaysAgo.toUtc(),
+          ),
+        ]);
+      final bloc = _createMapBloc(repository);
+      addTearDown(() async => bloc.close());
+
+      final trailFuture = bloc.stream.firstWhere(
+        (state) => state.trailPoints.length == 2,
+      );
+      bloc.add(
+        MapPuckPositionReceived(
+          latitude: 47.00105,
           longitude: -122,
-          recordedAtUtc: DateTime.utc(2026, 11, 5),
+          timestamp: DateTime.now().toUtc(),
         ),
-        RoutePoint(
-          id: 2,
-          routeDayId: 1,
-          sequence: 2,
-          latitude: 47.001,
+      );
+
+      final state = await trailFuture;
+      expect(state.trailPoints.first.latitude, 47.001);
+      expect(state.trailPoints.first.longitude, -122);
+      expect(state.trailPoints.last.latitude, 47.00105);
+      expect(repository.savedPoints, isEmpty);
+      expect(repository.requestedLocalDays, hasLength(2));
+      expect(
+        repository.requestedLocalDays,
+        containsAll([_formatLocalDay(today), _formatLocalDay(yesterday)]),
+      );
+
+      final extensionFuture = bloc.stream.firstWhere(
+        (nextState) => nextState.trailPoints.length == 3,
+      );
+      bloc.add(
+        MapPuckPositionReceived(
+          latitude: 47.00103,
           longitude: -122,
-          recordedAtUtc: DateTime.utc(2026, 11, 5, 0, 1),
+          timestamp: DateTime.now().toUtc().add(const Duration(seconds: 1)),
         ),
-      ]);
-    final bloc = _createMapBloc(repository);
-    addTearDown(() async => bloc.close());
+      );
+      final extendedState = await extensionFuture;
 
-    final trailFuture = bloc.stream.firstWhere(
-      (state) => state.trailPoints.length == 2,
-    );
-    bloc.add(
-      MapPuckPositionReceived(
-        latitude: 47.00101,
-        longitude: -122,
-        timestamp: DateTime.utc(2026, 11, 6),
-      ),
-    );
-
-    final state = await trailFuture;
-    expect(state.trailPoints.first.latitude, 47.001);
-    expect(state.trailPoints.first.longitude, -122);
-    expect(state.trailPoints.last.latitude, 47.00101);
-    expect(repository.savedPoints, isEmpty);
-
-    final extensionFuture = bloc.stream.firstWhere(
-      (nextState) => nextState.trailPoints.length == 3,
-    );
-    bloc.add(
-      MapPuckPositionReceived(
-        latitude: 47.00103,
-        longitude: -122,
-        timestamp: DateTime.utc(2026, 11, 6, 0, 0, 1),
-      ),
-    );
-    final extendedState = await extensionFuture;
-
-    expect(extendedState.trailPoints.first.latitude, 47.001);
-    expect(extendedState.trailPoints.length, 3);
-    expect(repository.savedPoints, isEmpty);
-  });
+      expect(extendedState.trailPoints.first.latitude, 47.001);
+      expect(extendedState.trailPoints.length, 3);
+      expect(repository.savedPoints, isEmpty);
+    },
+  );
 
   test('puck trail filter rejects movement under its minimum distance', () {
     final filter = LocationMovementFilter(minimumMovementMeters: 1);
@@ -138,6 +159,31 @@ void main() {
         ),
       ),
       isFalse,
+    );
+  });
+
+  test('route sampling reports every condition that caused a save', () {
+    final filter = RoutePointSamplingFilter();
+    final timestamp = DateTime.utc(2026, 11, 4);
+
+    expect(
+      filter.saveReasonsFor(
+        GeoPoint(latitude: 0, longitude: 0, timestamp: timestamp),
+      ),
+      {RoutePointSaveReason.firstPoint},
+    );
+    expect(
+      filter.saveReasonsFor(
+        GeoPoint(
+          latitude: 0.00006,
+          longitude: 0,
+          timestamp: timestamp.add(const Duration(seconds: 6)),
+        ),
+      ),
+      {
+        RoutePointSaveReason.minimumDistance,
+        RoutePointSaveReason.maximumInterval,
+      },
     );
   });
 
@@ -252,13 +298,19 @@ class _FakeLocationRepository implements LocationRepository {
 class _FakeRouteHistoryRepository implements RouteHistoryRepository {
   final List<GeoPoint> savedPoints = [];
   final List<RoutePoint> routePoints = [];
+  final List<String> requestedLocalDays = [];
 
   @override
   Future<List<RouteDay>> getSavedRouteDays() async => const [];
 
   @override
   Future<List<RoutePoint>> getPointsForDay({required String localDay}) async {
-    return routePoints;
+    requestedLocalDays.add(localDay);
+    return routePoints
+        .where(
+          (point) => _formatLocalDay(point.recordedAtUtc.toLocal()) == localDay,
+        )
+        .toList();
   }
 
   @override
@@ -291,4 +343,11 @@ class _FakeRouteHistoryRepository implements RouteHistoryRepository {
 
   @override
   Future<void> deleteAllRoutes() async {}
+}
+
+String _formatLocalDay(DateTime date) {
+  final year = date.year.toString().padLeft(4, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
 }

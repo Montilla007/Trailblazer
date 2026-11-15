@@ -9,44 +9,55 @@ class MapTrailGeoJson {
       '{"type":"FeatureCollection","features":[]}';
 
   static String live({
-    required List<GeoPoint> savedPoints,
+    required Map<String, List<GeoPoint>> savedTrailsByDay,
     required List<GeoPoint> temporaryPoints,
     required bool includeSavedTrail,
   }) {
-    final lines = <List<GeoPoint>>[];
-    if (includeSavedTrail && savedPoints.length >= 2) {
-      lines.add(savedPoints);
+    final features = <Map<String, Object?>>[];
+    if (includeSavedTrail) {
+      for (final entry in savedTrailsByDay.entries) {
+        if (entry.value.length >= 2) {
+          features.add(
+            _lineFeature(
+              entry.value,
+              properties: {'localDay': entry.key, 'trailType': 'saved'},
+            ),
+          );
+        }
+      }
     }
     if (temporaryPoints.length >= 2) {
-      lines.add(temporaryPoints);
+      features.add(
+        _lineFeature(temporaryPoints, properties: {'trailType': 'temporary'}),
+      );
     }
 
-    return _lineFeatureCollection(lines);
+    return _featureCollection(features);
   }
 
   static String singleLine(List<GeoPoint> points) {
     if (points.length < 2) return emptyFeatureCollection;
-    return _lineFeatureCollection([points]);
+    return _featureCollection([_lineFeature(points, properties: const {})]);
   }
 
-  static String _lineFeatureCollection(List<List<GeoPoint>> lines) {
-    if (lines.isEmpty) return emptyFeatureCollection;
+  static Map<String, Object?> _lineFeature(
+    List<GeoPoint> points, {
+    required Map<String, Object?> properties,
+  }) {
+    return {
+      'type': 'Feature',
+      'geometry': {
+        'type': 'LineString',
+        'coordinates': [
+          for (final point in points) [point.longitude, point.latitude],
+        ],
+      },
+      'properties': properties,
+    };
+  }
 
-    return jsonEncode({
-      'type': 'FeatureCollection',
-      'features': [
-        for (final points in lines)
-          {
-            'type': 'Feature',
-            'geometry': {
-              'type': 'LineString',
-              'coordinates': [
-                for (final point in points) [point.longitude, point.latitude],
-              ],
-            },
-            'properties': <String, Object?>{},
-          },
-      ],
-    });
+  static String _featureCollection(List<Map<String, Object?>> features) {
+    if (features.isEmpty) return emptyFeatureCollection;
+    return jsonEncode({'type': 'FeatureCollection', 'features': features});
   }
 }

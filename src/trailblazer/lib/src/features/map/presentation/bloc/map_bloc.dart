@@ -105,6 +105,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapSavedTrailVisibilityToggled>(_onSavedTrailVisibilityToggled);
     on<MapSavedTrailLoadRequested>(_onSavedTrailLoadRequested);
     on<MapAllSavedTrailLoadRequested>(_onAllSavedTrailLoadRequested);
+    on<MapRecentSavedTrailLoadRequested>(_onRecentSavedTrailLoadRequested);
     on<MapAllSavedRoutesDeleteRequested>(_onAllSavedRoutesDeleteRequested);
   }
 
@@ -118,6 +119,8 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     minimumMovementMeters: 1,
   );
   Future<List<GeoPoint>>? _allSavedTrailPointsLoad;
+  Future<Map<String, List<GeoPoint>>>? _recentSavedTrailPointsLoad;
+  String? _recentSavedTrailWindow;
   bool _puckTrailStarted = false;
 
   final SaveRoutePoint _saveRoutePoint;
@@ -150,15 +153,21 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       timestamp: event.timestamp,
     );
 
-    if (!_samplingFilter.shouldSave(point)) return;
+    final saveReasons = _samplingFilter.saveReasonsFor(point);
+    if (saveReasons == null) return;
 
     await _saveRoutePoint(point);
     if (!kDebugMode) return;
 
+    final reasonDescription = saveReasons
+        .map(_describeRoutePointSaveReason)
+        .join(', ');
+    final movementGate = saveReasons.contains(RoutePointSaveReason.firstPoint)
+        ? ''
+        : '; movement gate >= ${_samplingFilter.minimumMovementMeters} m passed';
     developer.log(
       '[Saved Cord] Saved route point to SQLite '
-      '(approx lat: ${point.latitude.toStringAsFixed(2)}, '
-      'lon: ${point.longitude.toStringAsFixed(2)}).',
+      '(trigger(s): $reasonDescription$movementGate).',
       name: 'trailblazer.map',
     );
 
@@ -191,6 +200,19 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     }
   }
 
+  String _describeRoutePointSaveReason(RoutePointSaveReason reason) {
+    return switch (reason) {
+      RoutePointSaveReason.firstPoint => 'first valid point',
+      RoutePointSaveReason.minimumDistance =>
+        'distance >= ${_samplingFilter.minimumDistanceMeters} m',
+      RoutePointSaveReason.maximumInterval =>
+        'elapsed time >= ${_samplingFilter.maximumInterval.inMilliseconds} ms',
+      RoutePointSaveReason.turn =>
+        'turn >= ${_samplingFilter.minimumTurnDegrees} degrees '
+            'after a ${_samplingFilter.headingSegmentMeters} m heading segment',
+    };
+  }
+
   Future<void> _onPuckPositionReceived(
     MapPuckPositionReceived event,
     Emitter<MapState> emit,
@@ -204,13 +226,14 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     if (!_puckTrailFilter.shouldAccept(point)) return;
 
     if (!_puckTrailStarted) {
-      var savedPoints = state.savedTrailPoints;
+      var savedTrailsByDay = state.liveSavedTrailPointsByDay;
       try {
-        savedPoints = await _loadAllSavedTrailPoints();
-        if (state.savedTrailLocalDay == null) {
+        savedTrailsByDay = await _loadRecentSavedTrailPointsByDay();
+        emit(state.copyWith(liveSavedTrailPointsByDay: savedTrailsByDay));
+        if (state.savedTrailLocalDay == null && !kDebugMode) {
           emit(
             state.copyWith(
-              savedTrailPoints: savedPoints,
+              savedTrailPoints: _flattenSavedTrailPoints(savedTrailsByDay),
               isSavedTrailVisible: true,
             ),
           );
@@ -230,7 +253,10 @@ class MapBloc extends Bloc<MapEvent, MapState> {
         );
       }
 
-      final anchor = _nearestPoint(point, savedPoints);
+      final anchor = _nearestPoint(
+        point,
+        _flattenSavedTrailPoints(savedTrailsByDay),
+      );
       if (anchor != null) {
         _trailPoints.add(anchor);
       }
@@ -335,6 +361,38 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     }
   }
 
+  Future<void> _onRecentSavedTrailLoadRequested(
+    MapRecentSavedTrailLoadRequested event,
+    Emitter<MapState> emit,
+  ) async {
+    emit(state.copyWith(clearDebugMessage: true));
+
+    try {
+      _recentSavedTrailPointsLoad = null;
+      _recentSavedTrailWindow = null;
+      final savedTrailsByDay = await _loadRecentSavedTrailPointsByDay();
+      final savedTrailPoints = _flattenSavedTrailPoints(savedTrailsByDay);
+      emit(
+        state.copyWith(
+          savedTrailPoints: savedTrailPoints,
+          liveSavedTrailPointsByDay: savedTrailsByDay,
+          isSavedTrailVisible: true,
+          clearSavedTrailLocalDay: true,
+          debugMessage: savedTrailPoints.isEmpty
+              ? 'No saved routes for today or yesterday.'
+              : 'Loaded ${savedTrailPoints.length} saved points from today and yesterday.',
+        ),
+      );
+    } on Exception catch (error) {
+      emit(
+        state.copyWith(
+          debugMessage: 'Could not load recent saved routes: $error',
+          debugMessageIsError: true,
+        ),
+      );
+    }
+  }
+
   Future<void> _onSavedTrailVisibilityToggled(
     MapSavedTrailVisibilityToggled event,
     Emitter<MapState> emit,
@@ -390,10 +448,14 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       emit(
         state.copyWith(
           savedTrailPoints: const [],
+          liveSavedTrailPointsByDay: const {},
           clearSavedTrailLocalDay: true,
           debugMessage: 'Deleted all saved route history.',
         ),
       );
+      _allSavedTrailPointsLoad = null;
+      _recentSavedTrailPointsLoad = null;
+      _recentSavedTrailWindow = null;
     } on Exception catch (error) {
       emit(
         state.copyWith(
@@ -424,6 +486,41 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     }
   }
 
+  Future<Map<String, List<GeoPoint>>> _loadRecentSavedTrailPointsByDay() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final todayKey = _formatLocalDay(today);
+    final yesterdayKey = _formatLocalDay(yesterday);
+    final windowKey = '$todayKey|$yesterdayKey';
+
+    if (_recentSavedTrailWindow != windowKey) {
+      _recentSavedTrailWindow = windowKey;
+      _recentSavedTrailPointsLoad = null;
+    }
+
+    final load = _recentSavedTrailPointsLoad ??= () async {
+      final pointsByDay = await Future.wait([
+        _getSavedTrailPoints(todayKey),
+        _getSavedTrailPoints(yesterdayKey),
+      ]);
+      return {todayKey: pointsByDay[0], yesterdayKey: pointsByDay[1]};
+    }();
+
+    try {
+      return await load;
+    } on Exception {
+      _recentSavedTrailPointsLoad = null;
+      rethrow;
+    }
+  }
+
+  List<GeoPoint> _flattenSavedTrailPoints(
+    Map<String, List<GeoPoint>> pointsByDay,
+  ) {
+    return [for (final points in pointsByDay.values) ...points];
+  }
+
   GeoPoint? _nearestPoint(GeoPoint position, List<GeoPoint> savedPoints) {
     GeoPoint? nearest;
     var nearestDistance = double.infinity;
@@ -449,13 +546,9 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     final sinHalfLongitude = sin(deltaLongitude / 2);
     final haversine =
         sinHalfLatitude * sinHalfLatitude +
-        cos(latitudeA) * cos(latitudeB) *
-            sinHalfLongitude *
-            sinHalfLongitude;
+        cos(latitudeA) * cos(latitudeB) * sinHalfLongitude * sinHalfLongitude;
 
-    return 2 *
-        earthRadiusMeters *
-        asin(sqrt(haversine.clamp(0.0, 1.0)));
+    return 2 * earthRadiusMeters * asin(sqrt(haversine.clamp(0.0, 1.0)));
   }
 
   List<GeoPoint> _toGeoPoints(Iterable<RoutePoint> points) {

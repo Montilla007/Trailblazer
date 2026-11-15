@@ -98,6 +98,10 @@ final class MapAllSavedTrailLoadRequested extends MapEvent {
   const MapAllSavedTrailLoadRequested();
 }
 
+final class MapRecentSavedTrailLoadRequested extends MapEvent {
+  const MapRecentSavedTrailLoadRequested();
+}
+
 final class MapAllSavedRoutesDeleteRequested extends MapEvent {
   const MapAllSavedRoutesDeleteRequested();
 }

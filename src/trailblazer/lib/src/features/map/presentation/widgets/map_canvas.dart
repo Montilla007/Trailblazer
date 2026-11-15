@@ -72,13 +72,14 @@ class _MapCanvasState extends State<MapCanvas> {
         BlocListener<MapBloc, MapState>(
           listenWhen: (previous, current) =>
               previous.trailPoints != current.trailPoints ||
-              previous.savedTrailPoints != current.savedTrailPoints ||
+              previous.liveSavedTrailPointsByDay !=
+                  current.liveSavedTrailPointsByDay ||
               previous.isLiveTrailVisible != current.isLiveTrailVisible,
           listener: (context, state) {
             unawaited(
               _updateLiveTrail(
                 state.trailPoints,
-                savedPoints: state.savedTrailPoints,
+                savedTrailsByDay: state.liveSavedTrailPointsByDay,
                 visible: state.isLiveTrailVisible,
               ),
             );
@@ -231,7 +232,7 @@ class _MapCanvasState extends State<MapCanvas> {
 
     await _updateLiveTrail(
       bloc.state.trailPoints,
-      savedPoints: bloc.state.savedTrailPoints,
+      savedTrailsByDay: bloc.state.liveSavedTrailPointsByDay,
       visible: bloc.state.isLiveTrailVisible,
     );
     await _updateSavedTrail(
@@ -242,7 +243,7 @@ class _MapCanvasState extends State<MapCanvas> {
 
   Future<void> _updateLiveTrail(
     List<GeoPoint> temporaryPoints, {
-    required List<GeoPoint> savedPoints,
+    required Map<String, List<GeoPoint>> savedTrailsByDay,
     required bool visible,
   }) async {
     final source = _liveTrailSource;
@@ -252,7 +253,7 @@ class _MapCanvasState extends State<MapCanvas> {
       visible
           ? MapTrailGeoJson.live(
               temporaryPoints: temporaryPoints,
-              savedPoints: savedPoints,
+              savedTrailsByDay: savedTrailsByDay,
               includeSavedTrail: !kDebugMode,
             )
           : MapTrailGeoJson.emptyFeatureCollection,
