@@ -140,6 +140,44 @@ void main() {
     },
   );
 
+  test(
+    'saved trail day window stays fixed until the map session ends',
+    () async {
+      var now = DateTime(2027, 1, 1, 23, 30);
+      final repository = _FakeRouteHistoryRepository();
+      final bloc = _createMapBloc(repository, clock: () => now);
+      addTearDown(() async => bloc.close());
+
+      final loadedFuture = bloc.stream.firstWhere(
+        (state) => state.liveSavedTrailPointsByDay.length == 2,
+      );
+      bloc.add(const MapRecentSavedTrailLoadRequested());
+      await loadedFuture;
+
+      now = DateTime(2027, 1, 2, 0, 1);
+      final trailFuture = bloc.stream.firstWhere(
+        (state) => state.trailPoints.isNotEmpty,
+      );
+      bloc.add(
+        MapPuckPositionReceived(
+          latitude: 47,
+          longitude: -122,
+          timestamp: now.toUtc(),
+        ),
+      );
+      final state = await trailFuture;
+
+      expect(state.liveSavedTrailPointsByDay.keys.toSet(), {
+        '2027-01-01',
+        '2026-12-31',
+      });
+      expect(repository.requestedLocalDays.toSet(), {
+        '2027-01-01',
+        '2026-12-31',
+      });
+    },
+  );
+
   test('puck trail filter rejects movement under its minimum distance', () {
     final filter = LocationMovementFilter(minimumMovementMeters: 1);
     final timestamp = DateTime.utc(2026, 11, 4);
@@ -278,13 +316,17 @@ void main() {
   });
 }
 
-MapBloc _createMapBloc(RouteHistoryRepository repository) {
+MapBloc _createMapBloc(
+  RouteHistoryRepository repository, {
+  DateTime Function()? clock,
+}) {
   return MapBloc(
     const WatchLocationUpdates(_FakeLocationRepository()),
     SaveRoutePoint(repository),
     GetRoutePointsForDay(repository),
     GetAllSavedRoutePoints(repository),
     DeleteAllSavedRoutes(repository),
+    clock: clock,
   );
 }
 

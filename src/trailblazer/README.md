@@ -37,7 +37,8 @@ that alternative.
 - Mapbox map with location puck, follow/recenter, zoom, and pitch controls.
 - Device location updates and GPS accuracy display.
 - Live Trail rendering from Mapbox's puck callback, anchored to the nearest
-  saved route coordinate from today or yesterday (device-local dates). In
+  saved route coordinate from today or yesterday (device-local dates captured
+  when the map session opens and held until it closes). In
   non-debug builds, each saved day and the temporary puck segment render as
   separate line features; the temporary segment remains in memory only.
   Geolocator positions continue to drive sampled route-point persistence using

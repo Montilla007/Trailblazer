@@ -23,8 +23,17 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     this._saveRoutePoint,
     this._getRoutePointsForDay,
     this._getAllSavedRoutePoints,
-    this._deleteAllSavedRoutes,
-  ) : super(const MapState()) {
+    this._deleteAllSavedRoutes, {
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now,
+       super(const MapState()) {
+    final localNow = _clock().toLocal();
+    final today = DateTime(localNow.year, localNow.month, localNow.day);
+    _recentSavedTrailToday = _formatLocalDay(today);
+    _recentSavedTrailYesterday = _formatLocalDay(
+      DateTime(today.year, today.month, today.day - 1),
+    );
+
     on<MapTrackingRequested>((event, emit) async {
       await _locationSubscription?.cancel();
 
@@ -113,6 +122,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   final GetRoutePointsForDay _getRoutePointsForDay;
   final GetAllSavedRoutePoints _getAllSavedRoutePoints;
   final DeleteAllSavedRoutes _deleteAllSavedRoutes;
+  final DateTime Function() _clock;
   StreamSubscription<GeoPoint>? _locationSubscription;
   final List<GeoPoint> _trailPoints = [];
   final LocationMovementFilter _puckTrailFilter = LocationMovementFilter(
@@ -120,7 +130,8 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   );
   Future<List<GeoPoint>>? _allSavedTrailPointsLoad;
   Future<Map<String, List<GeoPoint>>>? _recentSavedTrailPointsLoad;
-  String? _recentSavedTrailWindow;
+  late final String _recentSavedTrailToday;
+  late final String _recentSavedTrailYesterday;
   bool _puckTrailStarted = false;
 
   final SaveRoutePoint _saveRoutePoint;
@@ -369,7 +380,6 @@ class MapBloc extends Bloc<MapEvent, MapState> {
 
     try {
       _recentSavedTrailPointsLoad = null;
-      _recentSavedTrailWindow = null;
       final savedTrailsByDay = await _loadRecentSavedTrailPointsByDay();
       final savedTrailPoints = _flattenSavedTrailPoints(savedTrailsByDay);
       emit(
@@ -455,7 +465,6 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       );
       _allSavedTrailPointsLoad = null;
       _recentSavedTrailPointsLoad = null;
-      _recentSavedTrailWindow = null;
     } on Exception catch (error) {
       emit(
         state.copyWith(
@@ -487,24 +496,15 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   }
 
   Future<Map<String, List<GeoPoint>>> _loadRecentSavedTrailPointsByDay() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final todayKey = _formatLocalDay(today);
-    final yesterdayKey = _formatLocalDay(yesterday);
-    final windowKey = '$todayKey|$yesterdayKey';
-
-    if (_recentSavedTrailWindow != windowKey) {
-      _recentSavedTrailWindow = windowKey;
-      _recentSavedTrailPointsLoad = null;
-    }
-
     final load = _recentSavedTrailPointsLoad ??= () async {
       final pointsByDay = await Future.wait([
-        _getSavedTrailPoints(todayKey),
-        _getSavedTrailPoints(yesterdayKey),
+        _getSavedTrailPoints(_recentSavedTrailToday),
+        _getSavedTrailPoints(_recentSavedTrailYesterday),
       ]);
-      return {todayKey: pointsByDay[0], yesterdayKey: pointsByDay[1]};
+      return {
+        _recentSavedTrailToday: pointsByDay[0],
+        _recentSavedTrailYesterday: pointsByDay[1],
+      };
     }();
 
     try {
