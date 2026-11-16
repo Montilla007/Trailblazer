@@ -7,6 +7,8 @@ import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_ro
 import 'package:trailblazer/src/features/map/domain/usecases/get_all_saved_route_points.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_route_for_day.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/start_location_tracking.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/stop_location_tracking.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/watch_location_updates.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_bloc.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_event.dart';
@@ -25,12 +27,15 @@ class MapPage extends StatelessWidget {
       lazy: false,
       create: (context) {
         final repository = context.read<RouteHistoryRepository>();
+        final locationRepository = context.read<LocationRepository>();
         final bloc = MapBloc(
-          WatchLocationUpdates(context.read<LocationRepository>()),
+          WatchLocationUpdates(locationRepository),
           SaveRoutePoint(repository),
           GetRoutePointsForDay(repository),
           GetAllSavedRoutePoints(repository),
           DeleteAllSavedRoutes(repository),
+          startLocationTracking: StartLocationTracking(locationRepository),
+          stopLocationTracking: StopLocationTracking(locationRepository),
         )..add(const MapTrackingRequested());
 
         bloc.add(const MapRecentSavedTrailLoadRequested());
@@ -66,11 +71,19 @@ class _MapView extends StatelessWidget {
                           current.isSavedTrailVisible ||
                       previous.debugAccuracyMode != current.debugAccuracyMode ||
                       previous.debugMessage != current.debugMessage ||
+                      previous.locationUpdateCount !=
+                          current.locationUpdateCount ||
+                      previous.savedRoutePointCount !=
+                          current.savedRoutePointCount ||
                       previous.debugMessageIsError !=
                           current.debugMessageIsError,
                   builder: (context, state) {
                     return DebugActionPanel(
-                      message: state.debugMessage,
+                      message: [
+                        'Geolocator updates: ${state.locationUpdateCount}',
+                        'SQLite saves: ${state.savedRoutePointCount}',
+                        if (state.debugMessage != null) state.debugMessage!,
+                      ].join('\n'),
                       messageIsError: state.debugMessageIsError,
                       actions: [
                         DebugPanelAction(

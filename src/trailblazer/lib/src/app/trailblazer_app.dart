@@ -9,6 +9,7 @@ import 'package:trailblazer/src/features/map/domain/repositories/route_history_r
 import 'package:trailblazer/src/features/navigation/presentation/cubit/navigation_cubit.dart';
 import 'package:trailblazer/src/features/settings/presentation/cubit/appearance_cubit.dart';
 import 'package:trailblazer/src/features/map/data/datasources/device_location_data_source.dart';
+import 'package:trailblazer/src/features/map/data/datasources/foreground_recording_data_source.dart';
 import 'package:trailblazer/src/features/map/data/repositories/location_repository_impl.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
 
@@ -19,8 +20,15 @@ class TrailblazerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
+        RepositoryProvider<ForegroundRecordingDataSource>(
+          create: (_) => ForegroundRecordingDataSource(),
+          dispose: (source) => source.dispose(),
+        ),
         RepositoryProvider<LocationRepository>(
-          create: (_) => LocationRepositoryImpl(DeviceLocationDataSource()),
+          create: (context) => LocationRepositoryImpl(
+            DeviceLocationDataSource(),
+            context.read<ForegroundRecordingDataSource>(),
+          ),
         ),
         RepositoryProvider<RouteDatabase>(
           create: (_) => RouteDatabase(),

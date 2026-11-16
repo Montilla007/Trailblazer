@@ -14,12 +14,16 @@ final class MapLocationReceived extends MapEvent {
     required this.longitude,
     required this.timestamp,
     this.accuracyMeters,
+    this.persistenceHandledByService = false,
+    this.wasSaved = false,
   });
 
   final double latitude;
   final double longitude;
   final DateTime timestamp;
   final double? accuracyMeters;
+  final bool persistenceHandledByService;
+  final bool wasSaved;
 }
 
 final class MapPuckPositionReceived extends MapEvent {
@@ -46,6 +50,12 @@ final class MapPermissionDenied extends MapEvent {
 
 final class MapTrackingFailed extends MapEvent {
   const MapTrackingFailed(this.message);
+
+  final String message;
+}
+
+final class MapRecordingWarning extends MapEvent {
+  const MapRecordingWarning(this.message);
 
   final String message;
 }

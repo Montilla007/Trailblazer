@@ -26,6 +26,8 @@ class MapState {
     this.savedTrailLocalDay,
     this.debugMessage,
     this.debugMessageIsError = false,
+    this.locationUpdateCount = 0,
+    this.savedRoutePointCount = 0,
   });
 
   final MapStatus status;
@@ -46,6 +48,8 @@ class MapState {
   final String? savedTrailLocalDay;
   final String? debugMessage;
   final bool debugMessageIsError;
+  final int locationUpdateCount;
+  final int savedRoutePointCount;
 
   double? get effectiveAccuracyMeters {
     return switch (debugAccuracyMode) {
@@ -76,6 +80,8 @@ class MapState {
     String? savedTrailLocalDay,
     String? debugMessage,
     bool debugMessageIsError = false,
+    int? locationUpdateCount,
+    int? savedRoutePointCount,
     bool clearAccuracyMeters = false,
     bool clearErrorMessage = false,
     bool clearDebugMessage = false,
@@ -113,6 +119,8 @@ class MapState {
           : debugMessage != null
           ? debugMessageIsError
           : this.debugMessageIsError,
+      locationUpdateCount: locationUpdateCount ?? this.locationUpdateCount,
+      savedRoutePointCount: savedRoutePointCount ?? this.savedRoutePointCount,
     );
   }
 }

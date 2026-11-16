@@ -11,8 +11,12 @@ import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_ro
 import 'package:trailblazer/src/features/map/domain/usecases/get_all_saved_route_points.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_route_for_day.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/start_location_tracking.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/stop_location_tracking.dart';
 
 import '../../domain/entities/geo_point.dart';
+import '../../domain/entities/location_recording_warning.dart';
+import '../../domain/entities/location_update.dart';
 import '../../domain/usecases/watch_location_updates.dart';
 import 'map_event.dart';
 import 'map_state.dart';
@@ -24,6 +28,8 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     this._getRoutePointsForDay,
     this._getAllSavedRoutePoints,
     this._deleteAllSavedRoutes, {
+    required this._startLocationTracking,
+    required this._stopLocationTracking,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now,
        super(const MapState()) {
@@ -36,31 +42,57 @@ class MapBloc extends Bloc<MapEvent, MapState> {
 
     on<MapTrackingRequested>((event, emit) async {
       await _locationSubscription?.cancel();
+      _locationSubscription = null;
 
-      // MapTrackingRequested
       emit(
         state.copyWith(
           status: MapStatus.tracking,
           clearAccuracyMeters: true,
           clearErrorMessage: true,
+          debugMessage: kDebugMode ? 'Waiting for location updates.' : null,
+          debugMessageIsError: false,
+          clearDebugMessage: !kDebugMode,
         ),
       );
 
-      _locationSubscription = _watchLocationUpdates().listen(
-        (point) {
-          add(
-            MapLocationReceived(
-              latitude: point.latitude,
-              longitude: point.longitude,
-              timestamp: point.timestamp ?? DateTime.now().toUtc(),
-              accuracyMeters: point.accuracyMeters,
-            ),
-          );
-        },
-        onError: (Object error) {
-          add(MapTrackingFailed(error.toString()));
-        },
-      );
+      try {
+        await _startLocationTracking();
+        _locationSubscription = _watchLocationUpdates().listen(
+          (update) {
+            final point = update.point;
+            add(
+              MapLocationReceived(
+                latitude: point.latitude,
+                longitude: point.longitude,
+                timestamp: point.timestamp ?? DateTime.now().toUtc(),
+                accuracyMeters: point.accuracyMeters,
+                persistenceHandledByService: update.persistenceHandledByService,
+                wasSaved: update.wasSaved,
+              ),
+            );
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (error case LocationRecordingWarning(:final message)) {
+              developer.log(
+                'Background route recording warning: $message',
+                name: 'trailblazer.recording',
+                stackTrace: stackTrace,
+              );
+              add(MapRecordingWarning(message));
+              return;
+            }
+            add(MapTrackingFailed(error.toString()));
+          },
+        );
+      } catch (error, stackTrace) {
+        developer.log(
+          'Could not start route recording.',
+          name: 'trailblazer.map',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        add(MapTrackingFailed(error.toString()));
+      }
     });
 
     on<MapLocationReceived>(_onLocationReceived);
@@ -76,16 +108,52 @@ class MapBloc extends Bloc<MapEvent, MapState> {
         ),
       );
     });
+    on<MapRecordingWarning>((event, emit) {
+      if (!kDebugMode) return;
+      emit(
+        state.copyWith(
+          debugMessage: 'Background recording warning: ${event.message}',
+          debugMessageIsError: true,
+        ),
+      );
+    });
     on<MapTrackingStopped>((event, emit) async {
       await _locationSubscription?.cancel();
       _locationSubscription = null;
+      try {
+        await _stopLocationTracking();
+      } on Exception catch (error, stackTrace) {
+        developer.log(
+          'Could not stop route recording.',
+          name: 'trailblazer.map',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        emit(
+          state.copyWith(
+            status: MapStatus.error,
+            errorMessage: error.toString(),
+          ),
+        );
+        return;
+      }
       emit(const MapState(status: MapStatus.stopped));
     });
 
     on<MapTrackingFailed>((event, emit) async {
       await _locationSubscription?.cancel();
       _locationSubscription = null;
-      emit(MapState(status: MapStatus.error, errorMessage: event.message));
+      emit(
+        state.copyWith(
+          status: MapStatus.error,
+          errorMessage: event.message,
+          debugMessage: kDebugMode
+              ? 'Location stream failed: ${event.message}'
+              : null,
+          debugMessageIsError: kDebugMode,
+          clearDebugMessage: !kDebugMode,
+        ),
+      );
     });
 
     on<MapViewportFollowRequested>((event, emit) {
@@ -119,11 +187,13 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   }
 
   final WatchLocationUpdates _watchLocationUpdates;
+  final StartLocationTracking _startLocationTracking;
+  final StopLocationTracking _stopLocationTracking;
   final GetRoutePointsForDay _getRoutePointsForDay;
   final GetAllSavedRoutePoints _getAllSavedRoutePoints;
   final DeleteAllSavedRoutes _deleteAllSavedRoutes;
   final DateTime Function() _clock;
-  StreamSubscription<GeoPoint>? _locationSubscription;
+  StreamSubscription<LocationUpdate>? _locationSubscription;
   final List<GeoPoint> _trailPoints = [];
   final LocationMovementFilter _puckTrailFilter = LocationMovementFilter(
     minimumMovementMeters: 1,
@@ -154,6 +224,9 @@ class MapBloc extends Bloc<MapEvent, MapState> {
         accuracyMeters: accuracyMeters,
         clearAccuracyMeters: accuracyMeters == null,
         clearErrorMessage: true,
+        locationUpdateCount: kDebugMode
+            ? state.locationUpdateCount + 1
+            : state.locationUpdateCount,
       ),
     );
 
@@ -164,11 +237,50 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       timestamp: event.timestamp,
     );
 
+    if (event.persistenceHandledByService) {
+      if (event.wasSaved) {
+        await _recordSavedPoint(
+          point,
+          emit,
+          'Background service saved route point',
+        );
+      }
+      return;
+    }
+
     final saveReasons = _samplingFilter.saveReasonsFor(point);
     if (saveReasons == null) return;
 
-    await _saveRoutePoint(point);
-    if (!kDebugMode) return;
+    try {
+      await _saveRoutePoint(point);
+    } on Exception catch (error, stackTrace) {
+      developer.log(
+        '[Saved Trail] Could not save a route point to SQLite.',
+        name: 'trailblazer.map',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (kDebugMode) {
+        emit(
+          state.copyWith(
+            debugMessage: 'Could not save route point: $error',
+            debugMessageIsError: true,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (kDebugMode) {
+      emit(
+        state.copyWith(
+          savedRoutePointCount: state.savedRoutePointCount + 1,
+          debugMessage:
+              'Saved route point to SQLite (${state.savedRoutePointCount + 1} total).',
+          debugMessageIsError: false,
+        ),
+      );
+    }
 
     final reasonDescription = saveReasons
         .map(_describeRoutePointSaveReason)
@@ -182,8 +294,35 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       name: 'trailblazer.map',
     );
 
-    final localDay = _formatLocalDay(point.timestamp!.toLocal());
-    if (!state.isSavedTrailVisible) return;
+    await _refreshSavedTrailAfterSave(point, emit);
+  }
+
+  Future<void> _recordSavedPoint(
+    GeoPoint point,
+    Emitter<MapState> emit,
+    String message,
+  ) async {
+    if (kDebugMode) {
+      emit(
+        state.copyWith(
+          savedRoutePointCount: state.savedRoutePointCount + 1,
+          debugMessage: '$message (${state.savedRoutePointCount + 1} total).',
+          debugMessageIsError: false,
+        ),
+      );
+    }
+    await _refreshSavedTrailAfterSave(point, emit);
+  }
+
+  Future<void> _refreshSavedTrailAfterSave(
+    GeoPoint point,
+    Emitter<MapState> emit,
+  ) async {
+    if (!kDebugMode || !state.isSavedTrailVisible) return;
+
+    final timestamp = point.timestamp;
+    if (timestamp == null) return;
+    final localDay = _formatLocalDay(timestamp.toLocal());
 
     try {
       emit(

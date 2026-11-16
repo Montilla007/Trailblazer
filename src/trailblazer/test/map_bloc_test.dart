@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/map/domain/entities/location_recording_warning.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_day.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
+import 'package:trailblazer/src/features/map/domain/entities/location_update.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
 import 'package:trailblazer/src/features/map/domain/services/location_movement_filter.dart';
@@ -10,6 +14,8 @@ import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_ro
 import 'package:trailblazer/src/features/map/domain/usecases/get_all_saved_route_points.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_route_for_day.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/start_location_tracking.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/stop_location_tracking.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/watch_location_updates.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_bloc.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_event.dart';
@@ -60,6 +66,163 @@ void main() {
       expect(state.trailPoints, isEmpty);
       expect(repository.savedPoints, hasLength(1));
       expect(repository.savedPoints.single.timestamp, sampledAt);
+    },
+  );
+
+  test(
+    'service-saved update refreshes history without saving the point twice',
+    () async {
+      final repository = _FakeRouteHistoryRepository()
+        ..routePoints.add(
+          RoutePoint(
+            id: 1,
+            routeDayId: 1,
+            sequence: 1,
+            latitude: 47,
+            longitude: -122,
+            recordedAtUtc: DateTime.utc(2026, 11, 6),
+          ),
+        );
+      final updates = StreamController<LocationUpdate>();
+      addTearDown(updates.close);
+      final watchStarted = Completer<void>();
+      final locationRepository = _FakeLocationRepository(
+        updates: updates.stream,
+        onWatch: watchStarted.complete,
+      );
+      final bloc = _createMapBloc(
+        repository,
+        locationRepository: locationRepository,
+      );
+      addTearDown(bloc.close);
+
+      bloc.add(const MapTrackingRequested());
+      await watchStarted.future;
+      final savedTrailFuture = bloc.stream.firstWhere(
+        (state) => state.savedTrailPoints.isNotEmpty,
+      );
+      updates.add(
+        LocationUpdate(
+          point: GeoPoint(
+            latitude: 47,
+            longitude: -122,
+            timestamp: DateTime.utc(2026, 11, 6),
+          ),
+          persistenceHandledByService: true,
+          wasSaved: true,
+        ),
+      );
+
+      final state = await savedTrailFuture;
+      expect(state.savedTrailPoints, hasLength(1));
+      expect(repository.savedPoints, isEmpty);
+      expect(repository.getAllPointsCallCount, 1);
+    },
+  );
+
+  test(
+    'service update that was not saved does not write or reload history',
+    () async {
+      final repository = _FakeRouteHistoryRepository();
+      final updates = StreamController<LocationUpdate>();
+      addTearDown(updates.close);
+      final watchStarted = Completer<void>();
+      final bloc = _createMapBloc(
+        repository,
+        locationRepository: _FakeLocationRepository(
+          updates: updates.stream,
+          onWatch: watchStarted.complete,
+        ),
+      );
+      addTearDown(bloc.close);
+
+      bloc.add(const MapTrackingRequested());
+      await watchStarted.future;
+      final updateFuture = bloc.stream.firstWhere(
+        (state) => state.locationUpdateCount == 1,
+      );
+      updates.add(
+        LocationUpdate(
+          point: GeoPoint(
+            latitude: 47,
+            longitude: -122,
+            timestamp: DateTime.utc(2026, 11, 6),
+          ),
+          persistenceHandledByService: true,
+          wasSaved: false,
+        ),
+      );
+
+      final state = await updateFuture;
+      expect(state.savedTrailPoints, isEmpty);
+      expect(repository.savedPoints, isEmpty);
+      expect(repository.getAllPointsCallCount, 0);
+    },
+  );
+
+  test('location start failure transitions MapBloc to error', () async {
+    final bloc = _createMapBloc(
+      _FakeRouteHistoryRepository(),
+      locationRepository: _FakeLocationRepository(
+        startError: StateError('Location permission was not granted.'),
+      ),
+    );
+    addTearDown(bloc.close);
+
+    final errorFuture = bloc.stream.firstWhere(
+      (state) => state.status == MapStatus.error,
+    );
+    bloc.add(const MapTrackingRequested());
+
+    final state = await errorFuture;
+    expect(state.errorMessage, contains('Location permission was not granted'));
+  });
+
+  test(
+    'recoverable location warning does not disconnect later updates',
+    () async {
+      final updates = StreamController<LocationUpdate>();
+      addTearDown(updates.close);
+      final watchStarted = Completer<void>();
+      final bloc = _createMapBloc(
+        _FakeRouteHistoryRepository(),
+        locationRepository: _FakeLocationRepository(
+          updates: updates.stream,
+          onWatch: watchStarted.complete,
+        ),
+      );
+      addTearDown(bloc.close);
+
+      bloc.add(const MapTrackingRequested());
+      await watchStarted.future;
+      final warningFuture = bloc.stream.firstWhere(
+        (state) =>
+            state.debugMessage?.contains('temporary write failure') ?? false,
+      );
+      updates.addError(
+        const LocationRecordingWarning('temporary write failure'),
+      );
+      final warningState = await warningFuture;
+
+      final updateFuture = bloc.stream.firstWhere(
+        (state) => state.locationUpdateCount == 1,
+      );
+      updates.add(
+        LocationUpdate(
+          point: GeoPoint(
+            latitude: 47,
+            longitude: -122,
+            timestamp: DateTime.utc(2026, 11, 6),
+          ),
+          persistenceHandledByService: true,
+          wasSaved: false,
+        ),
+      );
+
+      final updateState = await updateFuture;
+      expect(warningState.status, MapStatus.tracking);
+      expect(updateState.status, MapStatus.tracking);
+      expect(updateState.locationUpdateCount, 1);
     },
   );
 
@@ -318,29 +481,53 @@ void main() {
 
 MapBloc _createMapBloc(
   RouteHistoryRepository repository, {
+  LocationRepository? locationRepository,
   DateTime Function()? clock,
 }) {
+  final location = locationRepository ?? const _FakeLocationRepository();
   return MapBloc(
-    const WatchLocationUpdates(_FakeLocationRepository()),
+    WatchLocationUpdates(location),
     SaveRoutePoint(repository),
     GetRoutePointsForDay(repository),
     GetAllSavedRoutePoints(repository),
     DeleteAllSavedRoutes(repository),
+    startLocationTracking: StartLocationTracking(location),
+    stopLocationTracking: StopLocationTracking(location),
     clock: clock,
   );
 }
 
 class _FakeLocationRepository implements LocationRepository {
-  const _FakeLocationRepository();
+  const _FakeLocationRepository({
+    this.updates = const Stream<LocationUpdate>.empty(),
+    this.onWatch,
+    this.startError,
+  });
+
+  final Stream<LocationUpdate> updates;
+  final void Function()? onWatch;
+  final Object? startError;
 
   @override
-  Stream<GeoPoint> watchLocation() => const Stream.empty();
+  Future<void> startTracking() async {
+    if (startError != null) throw startError!;
+  }
+
+  @override
+  Future<void> stopTracking() async {}
+
+  @override
+  Stream<LocationUpdate> watchLocation() {
+    onWatch?.call();
+    return updates;
+  }
 }
 
 class _FakeRouteHistoryRepository implements RouteHistoryRepository {
   final List<GeoPoint> savedPoints = [];
   final List<RoutePoint> routePoints = [];
   final List<String> requestedLocalDays = [];
+  int getAllPointsCallCount = 0;
 
   @override
   Future<List<RouteDay>> getSavedRouteDays() async => const [];
@@ -357,6 +544,7 @@ class _FakeRouteHistoryRepository implements RouteHistoryRepository {
 
   @override
   Future<List<RoutePoint>> getAllPoints() async {
+    getAllPointsCallCount++;
     if (savedPoints.isEmpty) return routePoints;
 
     return [
