@@ -72,8 +72,8 @@ class BackgroundRouteRecordingTask extends TaskHandler {
     if (shouldSave) {
       try {
         await _saveRoutePoint!(point);
-      } on Exception catch (error, stackTrace) {
-        _reportFailure(error, stackTrace);
+      } catch (error, stackTrace) {
+        _reportWarning(error, stackTrace);
         return;
       }
     }
@@ -97,7 +97,6 @@ class BackgroundRouteRecordingTask extends TaskHandler {
     try {
       final isForeground = await FlutterForegroundTask.isAppOnForeground;
       if (_lastForegroundState == isForeground) return;
-      _lastForegroundState = isForeground;
 
       final result = await FlutterForegroundTask.updateService(
         notificationTitle: 'Trailblazer is recording',
@@ -106,10 +105,12 @@ class BackgroundRouteRecordingTask extends TaskHandler {
             : 'The app is running in the background.',
       );
       if (result case ServiceRequestFailure(:final error)) {
-        _reportFailure(error, StackTrace.current);
+        _reportWarning(error, StackTrace.current);
+        return;
       }
-    } on Exception catch (error, stackTrace) {
-      _reportFailure(error, stackTrace);
+      _lastForegroundState = isForeground;
+    } catch (error, stackTrace) {
+      _reportWarning(error, stackTrace);
     } finally {
       _isUpdatingNotification = false;
     }
@@ -132,5 +133,18 @@ class BackgroundRouteRecordingTask extends TaskHandler {
         notificationText: 'Open the app to check recording status.',
       ),
     );
+  }
+
+  void _reportWarning(Object error, StackTrace stackTrace) {
+    developer.log(
+      'Background route recording warning.',
+      name: 'trailblazer.recording',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'warning',
+      'message': error.toString(),
+    });
   }
 }

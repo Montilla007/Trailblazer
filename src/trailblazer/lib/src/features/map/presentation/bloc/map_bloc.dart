@@ -15,6 +15,7 @@ import 'package:trailblazer/src/features/map/domain/usecases/start_location_trac
 import 'package:trailblazer/src/features/map/domain/usecases/stop_location_tracking.dart';
 
 import '../../domain/entities/geo_point.dart';
+import '../../domain/entities/location_recording_warning.dart';
 import '../../domain/entities/location_update.dart';
 import '../../domain/usecases/watch_location_updates.dart';
 import 'map_event.dart';
@@ -70,11 +71,26 @@ class MapBloc extends Bloc<MapEvent, MapState> {
               ),
             );
           },
-          onError: (Object error) {
+          onError: (Object error, StackTrace stackTrace) {
+            if (error case LocationRecordingWarning(:final message)) {
+              developer.log(
+                'Background route recording warning: $message',
+                name: 'trailblazer.recording',
+                stackTrace: stackTrace,
+              );
+              add(MapRecordingWarning(message));
+              return;
+            }
             add(MapTrackingFailed(error.toString()));
           },
         );
-      } on Exception catch (error) {
+      } catch (error, stackTrace) {
+        developer.log(
+          'Could not start route recording.',
+          name: 'trailblazer.map',
+          error: error,
+          stackTrace: stackTrace,
+        );
         add(MapTrackingFailed(error.toString()));
       }
     });
@@ -88,6 +104,15 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       emit(
         state.copyWith(
           debugMessage: 'Mapbox puck location unavailable: ${event.message}',
+          debugMessageIsError: true,
+        ),
+      );
+    });
+    on<MapRecordingWarning>((event, emit) {
+      if (!kDebugMode) return;
+      emit(
+        state.copyWith(
+          debugMessage: 'Background recording warning: ${event.message}',
           debugMessageIsError: true,
         ),
       );
@@ -293,10 +318,11 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     GeoPoint point,
     Emitter<MapState> emit,
   ) async {
+    if (!kDebugMode || !state.isSavedTrailVisible) return;
+
     final timestamp = point.timestamp;
     if (timestamp == null) return;
     final localDay = _formatLocalDay(timestamp.toLocal());
-    if (!state.isSavedTrailVisible) return;
 
     try {
       emit(

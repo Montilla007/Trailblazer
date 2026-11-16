@@ -54,6 +54,12 @@ final class MapTrackingFailed extends MapEvent {
   final String message;
 }
 
+final class MapRecordingWarning extends MapEvent {
+  const MapRecordingWarning(this.message);
+
+  final String message;
+}
+
 final class MapTrackingStopped extends MapEvent {
   const MapTrackingStopped();
 }

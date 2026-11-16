@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/map/domain/entities/location_recording_warning.dart';
 import 'package:trailblazer/src/features/map/domain/entities/location_update.dart';
 
 import '../services/background_route_recording_task.dart';
@@ -176,6 +177,13 @@ class ForegroundRecordingDataSource {
         _updates.addError(
           StateError(
             data['message']?.toString() ?? 'Background recording failed.',
+          ),
+        );
+      case 'warning':
+        _updates.addError(
+          LocationRecordingWarning(
+            data['message']?.toString() ??
+                'Background recording encountered a recoverable problem.',
           ),
         );
       default:
