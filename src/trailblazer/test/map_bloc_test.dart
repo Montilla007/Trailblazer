@@ -388,6 +388,62 @@ void main() {
     );
   });
 
+  test(
+    'route sampling rejects inaccurate points without shifting its baseline',
+    () {
+      final filter = RoutePointSamplingFilter();
+      final timestamp = DateTime.utc(2026, 11, 4);
+
+      expect(
+        filter.saveReasonsFor(
+          GeoPoint(
+            latitude: 0,
+            longitude: 0,
+            timestamp: timestamp,
+            accuracyMeters: 21,
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        filter.saveReasonsFor(
+          GeoPoint(
+            latitude: 0,
+            longitude: 0,
+            timestamp: timestamp.add(const Duration(seconds: 1)),
+            accuracyMeters: 20,
+          ),
+        ),
+        {RoutePointSaveReason.firstPoint},
+      );
+      expect(
+        filter.saveReasonsFor(
+          GeoPoint(
+            latitude: 0.00006,
+            longitude: 0,
+            timestamp: timestamp.add(const Duration(seconds: 2)),
+            accuracyMeters: 25,
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        filter.saveReasonsFor(
+          GeoPoint(
+            latitude: 0.00006,
+            longitude: 0,
+            timestamp: timestamp.add(const Duration(seconds: 7)),
+            accuracyMeters: 10,
+          ),
+        ),
+        {
+          RoutePointSaveReason.minimumDistance,
+          RoutePointSaveReason.maximumInterval,
+        },
+      );
+    },
+  );
+
   test('showing the saved trail loads today from the repository', () async {
     final repository = _FakeRouteHistoryRepository()
       ..routePoints.add(
@@ -446,15 +502,15 @@ void main() {
     expect(repository.savedPoints.single.accuracyMeters, isNull);
   });
 
-  test('selected debug accuracy is saved with the route point', () async {
+  test('selected fair debug accuracy is saved with the route point', () async {
     final repository = _FakeRouteHistoryRepository();
     final bloc = _createMapBloc(repository);
     addTearDown(() async => bloc.close());
 
     final modeFuture = bloc.stream.firstWhere(
-      (state) => state.debugAccuracyMode == DebugAccuracyMode.poor,
+      (state) => state.debugAccuracyMode == DebugAccuracyMode.fair,
     );
-    bloc.add(const MapDebugAccuracyModeSelected(DebugAccuracyMode.poor));
+    bloc.add(const MapDebugAccuracyModeSelected(DebugAccuracyMode.fair));
     final modeState = await modeFuture;
 
     final trailFuture = bloc.stream.firstWhere(
@@ -470,7 +526,7 @@ void main() {
     );
     final trailState = await trailFuture;
 
-    expect(modeState.effectiveAccuracyMeters, inInclusiveRange(20, 50));
+    expect(modeState.effectiveAccuracyMeters, inInclusiveRange(10, 19.9));
     expect(
       repository.savedPoints.single.accuracyMeters,
       modeState.effectiveAccuracyMeters,

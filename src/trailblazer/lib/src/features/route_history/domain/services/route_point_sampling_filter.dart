@@ -11,6 +11,7 @@ class RoutePointSamplingFilter {
     this.minimumMovementMeters = 2,
     this.headingSegmentMeters = 3,
     this.minimumTurnDegrees = 30,
+    this.maximumAccuracyMeters = 20,
   });
 
   final double minimumDistanceMeters;
@@ -18,6 +19,7 @@ class RoutePointSamplingFilter {
   final double minimumMovementMeters;
   final double headingSegmentMeters;
   final double minimumTurnDegrees;
+  final double maximumAccuracyMeters;
 
   GeoPoint? _lastSavedPoint;
   GeoPoint? _headingAnchor;
@@ -29,6 +31,7 @@ class RoutePointSamplingFilter {
 
   Set<RoutePointSaveReason>? saveReasonsFor(GeoPoint point) {
     final timestamp = point.timestamp;
+    final accuracy = point.accuracyMeters;
 
     if (timestamp == null ||
         !point.latitude.isFinite ||
@@ -36,7 +39,11 @@ class RoutePointSamplingFilter {
         point.latitude < -90 ||
         point.latitude > 90 ||
         point.longitude < -180 ||
-        point.longitude > 180) {
+        point.longitude > 180 ||
+        (accuracy != null &&
+            (!accuracy.isFinite ||
+                accuracy < 0 ||
+                accuracy > maximumAccuracyMeters))) {
       return null;
     }
 

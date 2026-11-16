@@ -66,6 +66,7 @@ MapBloc so the UI can update without writing the same points a second time.
 The live trail is currently held in MapBloc memory and rendered as a Mapbox GeoJSON line. Persisted Android points are written by the foreground task; MapBloc refreshes visible saved history from SQLite and does not duplicate those writes.
 
 Current RoutePointSamplingFilter defaults in code are:
+- Ignore route points reporting horizontal accuracy worse than 20 meters. Missing accuracy is allowed; invalid accuracy is rejected.
 - Save at about 5 meters of movement or 5 seconds elapsed.
 - Require at least 2 meters movement to reduce stationary drift saves.
 - Compare direction using 3-meter heading segments and a 30-degree turn threshold.
