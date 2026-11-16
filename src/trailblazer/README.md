@@ -36,21 +36,34 @@ that alternative.
 
 - Mapbox map with location puck, follow/recenter, zoom, and pitch controls.
 - Device location updates and GPS accuracy display.
+- Android route recording runs in an independent location foreground service.
+  Its ongoing notification reports whether Trailblazer is open or running in
+  the background and is not dismissible while recording. The service is
+  configured to continue when the app is removed from Recents. Recording still
+  starts automatically when the Map screen opens; an in-app Stop control and
+  reboot resumption are not implemented. The app requests notification and
+  location permissions when recording starts. Emulator checks confirmed the
+  notification state changes in the foreground and background; Recents-swipe
+  survival and physical-device behavior still need verification. Android
+  system controls and device battery-management policies can still stop or
+  restrict the service.
 - Live Trail rendering from Mapbox's puck callback, anchored to the nearest
   saved route coordinate from today or yesterday (device-local dates captured
   when the map session opens and held until it closes). In
   non-debug builds, each saved day and the temporary puck segment render as
   separate line features; the temporary segment remains in memory only.
-  Geolocator positions continue to drive sampled route-point persistence using
-  Drift/SQLite. A debug-only layer query compares puck callback and queried
-  positions.
+  The Android foreground service's Geolocator stream writes sampled route
+  points to Drift/SQLite; a debug-only layer query compares puck callback and
+  queried positions.
 - Debug-build-only Map panel and Saved Trail overlay for inspecting live and
-  saved routes, loading an individual date, and deleting all saved route
-  history after confirmation.
+  saved routes, showing Geolocator update and SQLite save counts, loading an
+  individual date, and deleting all saved route history after confirmation.
 - Album and History screens are placeholders.
 
-Photo capture/import and associations, background recording, offline map
-downloads, and cloud sync are not implemented.
+Photo capture/import and associations, notification actions such as an in-app
+Stop control, reboot resumption, offline map downloads, and cloud sync are not
+implemented.
+Background continuation has not been verified on a physical device.
 
 ## Code organization
 

@@ -1,6 +1,6 @@
 # Trailblazer Project Journal
 
-**Last updated:** November 4, 2026
+**Last updated:** November 17, 2026
 **Project:** Trailblazer  
 **Platform:** Android, minimum Android 13 (API 33)
 **App stack:** Flutter and Dart, Mapbox Maps Flutter, Geolocator, BLoC, Drift/SQLite
@@ -15,7 +15,7 @@ Trailblazer is a local-first personal travel journal. Its planned Map, Album, an
 - **Album:** future local collection of referenced photos, newest first, with time filters.
 - **History:** future daily movement summaries and places visited.
 
-Album and History remain placeholders. Photo capture/import, photo associations, background recording, offline map downloads, and cloud sync are not implemented.
+Album and History remain placeholders. Photo capture/import, photo associations, notification controls, reboot resumption, offline map downloads, and cloud sync are not implemented. Android route recording now uses an independent foreground service with an ongoing status notification. Foreground/background notification changes were checked on an emulator; Recents-swipe survival and physical-device behavior remain to be verified.
 
 ## 2. Current technology and architecture
 
@@ -24,6 +24,7 @@ Album and History remain placeholders. Photo capture/import, photo associations,
 - BLoC is used for the Map feature; Cubits remain in use for simpler navigation and appearance state.
 - Mapbox Maps Flutter is the selected map SDK. Current Map page code uses Mapbox APIs.
 - Geolocator provides the phone location stream used for location state and GPS accuracy.
+- Android route recording runs in `flutter_foreground_task`'s independent location foreground service. The service owns the ongoing notification, updates it with foreground/background app state, and persists sampled location points. The Map page starts recording automatically; an in-app Stop control and reboot resumption are not implemented. The app requests notification and location permissions when recording starts.
 - Drift provides the typed SQLite layer for local route history.
 - Current package versions are recorded in the nested Flutter project's pubspec.yaml. Mapbox Maps Flutter is the map SDK dependency; the unused MapLibre package was removed after checking that no code or platform configuration relied on it.
 
@@ -33,12 +34,14 @@ Keep plugin types out of the domain layer. Presentation coordinates UI/map SDK b
 
 ### Phone location and map puck
 
-Phone location services
+Android foreground task
   → Geolocator data source
-  → LocationRepository
-  → WatchLocationUpdates
+  → LocationRepository / WatchLocationUpdates
   → MapBloc / MapState
-  → GPS accuracy UI
+  → GPS accuracy UI and temporary map state
+
+On non-Android platforms, the location repository continues to stream device
+positions directly to MapBloc.
 
 The Map page also displays Mapbox's location puck. It samples the Mapbox location-indicator layer on a timer and dispatches MapPuckPositionSampled events. The map trail is built from puck coordinates so its displayed path follows the puck.
 
@@ -49,14 +52,18 @@ Mapbox puck sample
   → live trail in MapBloc state
   → GeoJSON source/layer on the map
 
-Mapbox puck sample
+Android foreground task location
   → RoutePointSamplingFilter
   → SaveRoutePoint use case
   → RouteHistoryRepository
   → RouteLocalDataSource
   → Drift / SQLite
 
-The live trail is currently held in MapBloc memory and rendered as a Mapbox GeoJSON line. Persistence is a separate, filtered stream; not every 50 ms puck sample should be written to SQLite.
+On non-Android platforms, MapBloc applies the route sampling filter and saves
+points. The Android service sends location and persistence-result messages to
+MapBloc so the UI can update without writing the same points a second time.
+
+The live trail is currently held in MapBloc memory and rendered as a Mapbox GeoJSON line. Persisted Android points are written by the foreground task; MapBloc refreshes visible saved history from SQLite and does not duplicate those writes.
 
 Current RoutePointSamplingFilter defaults in code are:
 - Save at about 5 meters of movement or 5 seconds elapsed.
@@ -86,7 +93,7 @@ Issue #18 covers saving filtered route coordinates locally by day. The current d
 
 The Drift database is RouteDatabase. Table definitions are in data/datasources/route_database.dart; generated route_database.g.dart is tooling output and must not be edited manually. build.yaml configures Drift DateTime storage as text. RouteLocalDataSource creates/finds a day row, assigns the next sequence, saves a point, and reads a day's points ordered by sequence. RouteHistoryRepositoryImpl implements the domain contract. TrailblazerApp provides and closes the database and provides the route repository.
 
-SaveRoutePoint derives the local day and timezone offset from the puck sample timestamp before delegating to the repository. RoutePointSamplingFilter gates persistence in MapBloc. The database, repository read methods, and route-read use cases are present. In debug builds, the Map panel loads all saved points at startup, draws them as one connected blue line in timestamp order, and refreshes the line after each successful save. It can also load a selected day and delete all saved route rows after confirmation.
+SaveRoutePoint derives the local day and timezone offset from the device-location timestamp before delegating to the repository. On Android, RoutePointSamplingFilter runs in the foreground recording task; on other platforms it runs in MapBloc. The database, repository read methods, and route-read use cases are present. In debug builds, the Map panel loads all saved points at startup, draws them as one connected blue line in timestamp order, and refreshes the line after each successful save. It can also load a selected day and delete all saved route rows after confirmation.
 
 **Status:** storage code is present but still needs end-to-end verification. Do not treat issue #18 as finished until writes and reads have been checked on the running app.
 
@@ -110,14 +117,18 @@ lib/
       map/
         data/datasources/
           device_location_data_source.dart
+          foreground_recording_data_source.dart
           route_database.dart
           route_database.g.dart
           route_local_data_source.dart
+        data/services/
+          background_route_recording_task.dart
         data/repositories/
           location_repository_impl.dart
           route_history_repository_impl.dart
         domain/entities/
           geo_point.dart
+          location_update.dart
           route_point.dart
         domain/repositories/
           location_repository.dart
@@ -127,6 +138,8 @@ lib/
         domain/usecases/
           get_current_location.dart
           save_route_point.dart
+          start_location_tracking.dart
+          stop_location_tracking.dart
           watch_location_updates.dart
         presentation/bloc/
           map_bloc.dart
@@ -157,11 +170,15 @@ Implemented in the current code:
 - Zoom and 2D/3D pitch controls.
 - GPS accuracy indicator driven by MapBloc location state.
 - Live trail drawn as a GeoJSON line, currently using green #28664A.
-- Puck samples sent to MapBloc, with filtered samples routed to local persistence.
+- Puck samples sent to MapBloc for temporary live-trail display.
+- Android independent location foreground service persists filtered route points and shows an ongoing notification indicating whether the app is open or in the background.
 - Debug-only expandable panel for toggling live-trail visibility, displaying all saved route points as one connected line as SQLite writes arrive, loading a saved route by local date, and confirmed deletion of all persisted route history.
+- Debug panel reports Geolocator update and successful SQLite-save counts, and surfaces route-write errors without exposing location coordinates.
 - Live and loaded saved trails use separate map sources and layers.
 
 Needs verification or review:
+- Verify that the service survives swiping Trailblazer from Recents, and verify background location updates and route persistence on a physical Android device. Emulator checks confirmed foreground/background notification text; they did not verify Recents-swipe survival.
+- The notification is non-dismissible while the service is running, but there is no in-app Stop action; Android system controls can still stop the service.
 - The latest reported `flutter analyze` completed with no issues.
 - Verify a filtered point is written to SQLite, then verify getPointsForDay returns it after an app restart.
 - Bound long-running live-trail memory growth. Filtering database writes does not bound the in-memory trail list.
@@ -180,10 +197,10 @@ Both remain placeholders. Album sorting/filtering and History daily summaries ar
 
 ## 8. Known boundaries and next steps
 
-1. Continue issue #18 by validating the current route-point save/read path; do not add the deferred Live/Saved/Both control yet.
+1. Verify the ongoing service and persisted route points after swiping the app from Recents, then repeat on a physical Android device when available.
 2. Verify local day grouping and point sequence on the device/emulator.
 3. Bound long-running live-trail memory growth; database sampling does not bound the in-memory trail list.
-4. Keep offline map downloads, background startup, photos, Album, History, and cloud sync outside the current route-storage work unless the user changes scope.
+4. Keep offline map downloads, reboot resumption, photos, Album, History, and cloud sync outside the current route-recording work unless the user changes scope.
 
 ## 9. Resuming work
 

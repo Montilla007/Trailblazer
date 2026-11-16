@@ -1,4 +1,4 @@
-import '../entities/geo_point.dart';
+import '../entities/location_update.dart';
 import '../repositories/location_repository.dart';
 
 class WatchLocationUpdates {
@@ -6,7 +6,7 @@ class WatchLocationUpdates {
 
   final LocationRepository _repository;
 
-  Stream<GeoPoint> call() {
+  Stream<LocationUpdate> call() {
     return _repository.watchLocation();
   }
 }

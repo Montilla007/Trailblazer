@@ -1,5 +1,9 @@
-import '../entities/geo_point.dart';
+import '../entities/location_update.dart';
 
 abstract interface class LocationRepository {
-  Stream<GeoPoint> watchLocation();
+  Future<void> startTracking();
+
+  Future<void> stopTracking();
+
+  Stream<LocationUpdate> watchLocation();
 }

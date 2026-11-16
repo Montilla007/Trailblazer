@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_day.dart';
 import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
+import 'package:trailblazer/src/features/map/domain/entities/location_update.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/location_repository.dart';
 import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
 import 'package:trailblazer/src/features/map/domain/services/location_movement_filter.dart';
@@ -10,6 +11,8 @@ import 'package:trailblazer/src/features/map/domain/usecases/delete_all_saved_ro
 import 'package:trailblazer/src/features/map/domain/usecases/get_all_saved_route_points.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/get_route_for_day.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/start_location_tracking.dart';
+import 'package:trailblazer/src/features/map/domain/usecases/stop_location_tracking.dart';
 import 'package:trailblazer/src/features/map/domain/usecases/watch_location_updates.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_bloc.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_event.dart';
@@ -326,6 +329,10 @@ MapBloc _createMapBloc(
     GetRoutePointsForDay(repository),
     GetAllSavedRoutePoints(repository),
     DeleteAllSavedRoutes(repository),
+    startLocationTracking: StartLocationTracking(
+      const _FakeLocationRepository(),
+    ),
+    stopLocationTracking: StopLocationTracking(const _FakeLocationRepository()),
     clock: clock,
   );
 }
@@ -334,7 +341,13 @@ class _FakeLocationRepository implements LocationRepository {
   const _FakeLocationRepository();
 
   @override
-  Stream<GeoPoint> watchLocation() => const Stream.empty();
+  Future<void> startTracking() async {}
+
+  @override
+  Future<void> stopTracking() async {}
+
+  @override
+  Stream<LocationUpdate> watchLocation() => const Stream.empty();
 }
 
 class _FakeRouteHistoryRepository implements RouteHistoryRepository {
