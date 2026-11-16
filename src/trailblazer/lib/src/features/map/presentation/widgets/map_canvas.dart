@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_bloc.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_event.dart';
 import 'package:trailblazer/src/features/map/presentation/bloc/map_state.dart';

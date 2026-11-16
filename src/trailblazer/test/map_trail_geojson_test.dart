@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
 import 'package:trailblazer/src/features/map/presentation/services/map_trail_geojson.dart';
 
 void main() {

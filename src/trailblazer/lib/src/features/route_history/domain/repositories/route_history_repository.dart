@@ -1,4 +1,5 @@
-import '../entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
+
 import '../entities/route_day.dart';
 import '../entities/route_point.dart';
 

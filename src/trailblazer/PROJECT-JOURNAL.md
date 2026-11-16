@@ -91,7 +91,7 @@ Issue #18 covers saving filtered route coordinates locally by day. The current d
 - recordedAtUtc: timestamp stored as UTC.
 - accuracyMeters: nullable accuracy value.
 
-The Drift database is RouteDatabase. Table definitions are in data/datasources/route_database.dart; generated route_database.g.dart is tooling output and must not be edited manually. build.yaml configures Drift DateTime storage as text. RouteLocalDataSource creates/finds a day row, assigns the next sequence, saves a point, and reads a day's points ordered by sequence. RouteHistoryRepositoryImpl implements the domain contract. TrailblazerApp provides and closes the database and provides the route repository.
+The Drift database is `RouteDatabase`. Table definitions are in `features/route_history/data/datasources/route_database.dart`; generated `route_database.g.dart` is tooling output and must not be edited manually. `build.yaml` configures Drift DateTime storage as text. `RouteLocalDataSource` creates/finds a day row, assigns the next sequence, saves a point, and reads a day's points ordered by sequence. `RouteHistoryRepositoryImpl` implements the domain contract. `TrailblazerApp` provides and closes the database and provides the route repository.
 
 SaveRoutePoint derives the local day and timezone offset from the device-location timestamp before delegating to the repository. On Android, RoutePointSamplingFilter runs in the foreground recording task; on other platforms it runs in MapBloc. The database, repository read methods, and route-read use cases are present. In debug builds, the Map panel loads all saved points at startup, draws them as one connected blue line in timestamp order, and refreshes the line after each successful save. It can also load a selected day and delete all saved route rows after confirmation.
 
@@ -115,45 +115,32 @@ lib/
       app_theme.dart
     features/
       map/
-        data/datasources/
-          device_location_data_source.dart
-          foreground_recording_data_source.dart
-          route_database.dart
-          route_database.g.dart
-          route_local_data_source.dart
-        data/services/
-          background_route_recording_task.dart
-        data/repositories/
-          location_repository_impl.dart
-          route_history_repository_impl.dart
-        domain/entities/
-          geo_point.dart
-          location_update.dart
-          route_point.dart
-        domain/repositories/
-          location_repository.dart
-          route_history_repository.dart
-        domain/services/
-          route_point_sampling_filter.dart
-        domain/usecases/
-          get_current_location.dart
-          save_route_point.dart
-          start_location_tracking.dart
-          stop_location_tracking.dart
-          watch_location_updates.dart
+        domain/services/location_movement_filter.dart
         presentation/bloc/
-          map_bloc.dart
-          map_event.dart
-          map_state.dart
-        presentation/pages/map_page.dart
-        presentation/widgets/map_canvas.dart
+        presentation/pages/
+        presentation/services/
+        presentation/widgets/
+      location_tracking/
+        data/datasources/
+        data/repositories/
+        data/services/
+        domain/entities/
+        domain/repositories/
+        domain/usecases/
+      route_history/
+        data/datasources/
+        data/repositories/
+        domain/entities/
+        domain/repositories/
+        domain/services/
+        domain/usecases/
       navigation/presentation/cubit/navigation_cubit.dart
       settings/presentation/cubit/appearance_cubit.dart
     shared/widgets/gps_accuracy_indicator.dart
 
 Other important files:
 - main.dart loads the Mapbox access token from local .env configuration.
-- trailblazer_app.dart provides LocationRepository, RouteDatabase, and RouteHistoryRepository, plus NavigationCubit and AppearanceCubit.
+- trailblazer_app.dart provides location-tracking and route-history repositories, the route database, NavigationCubit, and AppearanceCubit.
 - app_shell.dart provides the app bar, hamburger menu, and Map/Album/History navigation.
 - app_theme.dart holds shared light/dark theme definitions.
 - map_page.dart owns the Map screen layout and controls; map_canvas.dart owns Mapbox widget lifecycle, camera/gesture integration, trail rendering, and puck sampling.

@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import '../entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
 
 enum RoutePointSaveReason { firstPoint, minimumDistance, maximumInterval, turn }
 

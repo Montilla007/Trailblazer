@@ -1,4 +1,4 @@
-import '../../domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
 
 enum MapStatus { initial, tracking, stopped, error }
 

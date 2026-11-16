@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
 
 class MapboxPuckLocationSource {
   const MapboxPuckLocationSource();

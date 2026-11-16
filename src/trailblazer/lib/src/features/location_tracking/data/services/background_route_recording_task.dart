@@ -3,13 +3,13 @@ import 'dart:developer' as developer;
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:trailblazer/src/features/map/data/datasources/route_database.dart';
-import 'package:trailblazer/src/features/map/data/datasources/route_local_data_source.dart';
-import 'package:trailblazer/src/features/map/data/repositories/route_history_repository_impl.dart';
-import 'package:trailblazer/src/features/map/data/datasources/device_location_data_source.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
-import 'package:trailblazer/src/features/map/domain/services/route_point_sampling_filter.dart';
-import 'package:trailblazer/src/features/map/domain/usecases/save_route_point.dart';
+import 'package:trailblazer/src/features/location_tracking/data/datasources/device_location_data_source.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/route_history/data/datasources/route_database.dart';
+import 'package:trailblazer/src/features/route_history/data/datasources/route_local_data_source.dart';
+import 'package:trailblazer/src/features/route_history/data/repositories/route_history_repository_impl.dart';
+import 'package:trailblazer/src/features/route_history/domain/services/route_point_sampling_filter.dart';
+import 'package:trailblazer/src/features/route_history/domain/usecases/save_route_point.dart';
 
 @pragma('vm:entry-point')
 void startBackgroundRouteRecording() {

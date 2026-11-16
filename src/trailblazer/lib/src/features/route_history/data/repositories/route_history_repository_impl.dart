@@ -1,8 +1,8 @@
-import 'package:trailblazer/src/features/map/data/datasources/route_local_data_source.dart';
-import 'package:trailblazer/src/features/map/domain/entities/route_day.dart';
-import 'package:trailblazer/src/features/map/domain/entities/route_point.dart';
-import 'package:trailblazer/src/features/map/domain/repositories/route_history_repository.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/route_history/data/datasources/route_local_data_source.dart';
+import 'package:trailblazer/src/features/route_history/domain/entities/route_day.dart';
+import 'package:trailblazer/src/features/route_history/domain/entities/route_point.dart';
+import 'package:trailblazer/src/features/route_history/domain/repositories/route_history_repository.dart';
 
 class RouteHistoryRepositoryImpl implements RouteHistoryRepository {
   RouteHistoryRepositoryImpl(this._localDataSource);

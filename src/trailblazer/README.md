@@ -71,8 +71,10 @@ Application code is under `lib/src/`, grouped by responsibility:
 
 - `app/` — app setup, dependency providers, and main navigation shell.
 - `core/` — app-wide configuration and theme.
-- `features/map/` — map presentation, location and route domain logic, and
-  device/database integrations.
+- `features/map/` — Mapbox presentation and live-trail behavior.
+- `features/location_tracking/` — location domain, device sources, and the
+  Android foreground recording service.
+- `features/route_history/` — route domain, sampling, and Drift/SQLite storage.
 - `features/navigation/` and `features/settings/` — navigation and appearance
   state.
 - `shared/` — reusable widgets.

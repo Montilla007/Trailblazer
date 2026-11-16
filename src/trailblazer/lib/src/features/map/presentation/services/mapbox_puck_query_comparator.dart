@@ -3,7 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:math' as math;
 
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
 
 class MapboxPuckQueryComparator {
   MapboxPuckQueryComparator(this._map);

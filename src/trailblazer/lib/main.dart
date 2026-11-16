@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:trailblazer/src/features/map/data/datasources/foreground_recording_data_source.dart';
+import 'package:trailblazer/src/features/location_tracking/data/datasources/foreground_recording_data_source.dart';
 
 import './src/app/trailblazer_app.dart'; // Adjust to your actual app import.
 

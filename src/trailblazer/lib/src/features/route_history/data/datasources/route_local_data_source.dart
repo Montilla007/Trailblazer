@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
-import 'package:trailblazer/src/features/map/data/datasources/route_database.dart';
-import 'package:trailblazer/src/features/map/domain/entities/geo_point.dart';
-import 'package:trailblazer/src/features/map/domain/entities/route_day.dart'
+import 'package:trailblazer/src/features/location_tracking/domain/entities/geo_point.dart';
+import 'package:trailblazer/src/features/route_history/data/datasources/route_database.dart';
+import 'package:trailblazer/src/features/route_history/domain/entities/route_day.dart'
     as domain_day;
-import 'package:trailblazer/src/features/map/domain/entities/route_point.dart'
+import 'package:trailblazer/src/features/route_history/domain/entities/route_point.dart'
     as domain;
 
 class RouteLocalDataSource {
